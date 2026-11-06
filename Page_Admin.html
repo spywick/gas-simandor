@@ -1,0 +1,70 @@
+<script>
+  const PageAdmin = {
+    template: `
+      <div class="space-y-6">
+        <!-- Kartu Navigasi Tab Admin -->
+        <div class="bg-white border border-gray-100 rounded-xl p-4 shadow-sm flex flex-wrap items-center justify-between gap-4">
+          <div>
+            <h3 class="text-sm font-semibold text-gray-900">Panel Admin Sistem</h3>
+            <p class="text-xs text-gray-600 mt-0.5">Pusat pengelolaan data master pengguna, tahun, dan tim kerja.</p>
+          </div>
+          
+          <!-- Tombol Pilihan Tab -->
+          <div class="flex bg-gray-100 p-1 rounded text-xs font-semibold">
+            <button @click="activeTab = 'user'" 
+              :class="activeTab === 'user' ? 'bg-white hover:bg-blue-50 border border-blue-200 text-blue-600 shadow-sm' : 'text-gray-600 hover:text-gray-900 border border-gray-200'"
+              class="px-4 py-2  transition">
+              User
+            </button>
+            <button @click="activeTab = 'tahun'" 
+              :class="activeTab === 'tahun' ? 'bg-white hover:bg-blue-50 border border-blue-200 text-blue-600 shadow-sm' : 'text-gray-600 hover:text-gray-900 border border-gray-200'"
+              class="px-4 py-2  transition">
+              Tahun
+            </button>
+            <button @click="activeTab = 'tim'" 
+              :class="activeTab === 'tim' ? 'bg-white hover:bg-blue-50 border border-blue-200 text-blue-600 shadow-sm' : 'text-gray-600 hover:text-gray-900 border border-gray-200'"
+              class="px-4 py-2  transition">
+              Tim
+            </button>
+          </div>
+        </div>
+
+        <!-- Indikator Pesan Loading -->
+        <div v-if="isLoading" class="bg-white border border-gray-100 rounded-xl p-12 shadow-sm flex flex-col items-center justify-center space-y-3">
+          <div class="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+          <p class="text-xs font-medium text-gray-500 animate-pulse">Memuat halaman {{ activeTab.toUpperCase() }}...</p>
+        </div>
+        
+        <!-- Wadah Konten Dinamis Berdasarkan Tab yang Dipilih -->
+        <div v-else>
+          <keep-alive>
+            <component :is="'page-' + activeTab"></component>
+          </keep-alive>
+        </div>
+      </div>
+    `,
+    setup() {
+      const { ref } = Vue;
+      const activeTab = ref('user'); // Tab default pertama saat masuk menu admin adalah 'user'
+      const isLoading = ref(false);
+
+      const switchTab = (tabName) => {
+        if (activeTab.value === tabName) return;
+        
+        isLoading.value = true;
+        activeTab.value = tabName;
+
+        // Simulasi jeda loading singkat (misal 300ms) agar animasi terlihat halus saat komponen dimuat
+        setTimeout(() => {
+          isLoading.value = false;
+        }, 300);
+      };
+
+      return {
+        activeTab,
+        isLoading,
+        switchTab
+      };
+    }
+  };
+</script>

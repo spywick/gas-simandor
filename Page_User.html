@@ -1,0 +1,406 @@
+<script>
+  const PageUser = {
+    template: `
+      <!-- Wadah utama -->
+      <div class="space-y-6">
+        
+        <!-- Toast Notifikasi Melayang (Alert Kustom) -->
+        <div v-if="toast.show" :class="toast.type === 'success' ? 'bg-green-600' : 'bg-red-600'" class="fixed top-5 right-5 z-50 text-white px-4 py-3 rounded-xl shadow-lg flex items-center space-x-2 text-xs transition-all duration-300">
+          <span>{{ toast.type === 'success' ? '✅' : '⚠️' }}</span>
+          <span class="font-medium">{{ toast.message }}</span>
+        </div>
+
+        <!-- Kartu Utama Manajemen User -->
+        <div class="bg-white border border-gray-100 rounded-xl shadow-sm overflow-hidden">
+          
+          <!-- Header Card & Tombol Tambah -->
+          <div class="p-4 sm:p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div>
+              <h3 class="text-sm font-semibold text-gray-900">Manajemen User</h3>
+              <p class="text-xs text-gray-600 mt-0.5">Kelola daftar akun pengguna sistem SIMANDOR.</p>
+            </div>
+            
+            <div class="flex items-center space-x-2">
+              <button @click="fetchUsers" :disabled="loading" class="bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-2 rounded-lg text-xs font-semibold shadow-sm transition flex items-center space-x-1 disabled:opacity-50" title="Muat ulang data">
+                <svg :class="{'animate-spin': loading}" class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                </svg>
+                <span>Refresh</span>
+              </button>
+              
+              <button @click="openModal('create')" class="bg-blue-600 hover:bg-blue-700 text-white px-3.5 py-2 rounded-lg text-xs font-semibold shadow transition flex items-center space-x-1.5 flex-shrink-0">
+                <span>+ Tambah User</span>
+              </button>
+            </div>
+          </div>
+
+          <hr class="border-gray-100">
+
+          <!-- Kontrol Atas Tabel (Filter & Pencarian) -->
+          <div class="p-4 sm:p-5 bg-gray-50/50 border-b border-gray-100 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 text-xs">
+            <div class="flex items-center space-x-2 text-gray-600">
+              <span>Tampilkan</span>
+              <select v-model.number="perPage" @change="currentPage = 1" class="border border-gray-300 rounded-lg px-2.5 py-1.5 bg-white focus:ring-2 focus:ring-blue-500 focus:outline-none font-medium">
+                <option :value="5">5</option>
+                <option :value="10">10</option>
+                <option :value="25">25</option>
+                <option :value="50">50</option>
+              </select>
+              <span>data per halaman</span>
+            </div>
+
+            <div class="w-full md:w-72 relative">
+              <span class="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-gray-400">🔍</span>
+              <input v-model="searchQuery" @input="currentPage = 1" type="text" placeholder="Cari nama atau email..." class="w-full pl-9 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none bg-white" />
+            </div>
+          </div>
+
+          <div class="px-4 sm:px-6 pt-4 text-xs text-gray-500 font-medium flex justify-between items-center">
+            <span>{{ paginationInfo }}</span>
+          </div>
+
+          <!-- Tabel Data User -->
+          <div class="p-4 sm:p-6 pt-2">
+            <div class="overflow-x-auto">
+              <table class="min-w-full divide-y divide-gray-200 text-xs">
+                <thead class="bg-gray-50 text-gray-500 uppercase font-semibold">
+                  <tr>
+                    <th class="px-4 py-3 text-left">No</th>
+                    <th class="px-4 py-3 text-left">Nama</th>
+                    <th class="px-4 py-3 text-left">Email</th>
+                    <th class="px-4 py-3 text-left">Level</th>
+                    <th class="px-4 py-3 text-left">Status</th>
+                    <th class="px-4 py-3 text-left">Created At</th>
+                    <th class="px-4 py-3 text-center">Aksi</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-200 bg-white">
+                  <tr v-if="loading">
+                    <td colspan="7" class="px-4 py-8 text-center text-gray-400">
+                      <div class="inline-block w-6 h-6 border-2 border-blue-600 border-t-transparent rounded-full animate-spin mr-2"></div>
+                      Memuat data user...
+                    </td>
+                  </tr>
+
+                  <tr v-else-if="paginatedUsers.length === 0">
+                    <td colspan="7" class="px-4 py-8 text-center text-gray-400">Tidak ada data User yang ditemukan.</td>
+                  </tr>
+
+                  <tr v-else v-for="(user, index) in paginatedUsers" :key="user.ID_USER" class="hover:bg-gray-50 transition">
+                    <td class="px-4 py-3 text-gray-500 font-medium">{{ startIndex + index + 1 }}</td>
+                    <td class="px-4 py-3 font-medium text-gray-900">{{ user.NAMA }}</td>
+                    <td class="px-4 py-3 text-gray-600">{{ user.EMAIL }}</td>
+                    <td class="px-4 py-3">
+                      <span :class="user.LEVEL === 'admin' ? 'bg-purple-100 text-purple-800 border border-purple-200' : 'bg-blue-100 text-blue-800 border border-blue-200'" class="px-2.5 py-0.5 text-[10px] font-bold rounded-full capitalize">
+                        {{ user.LEVEL }}
+                      </span>
+                    </td>
+                    <td class="px-4 py-3">
+                      <span :class="user.STATUS === 'aktif' ? 'bg-green-100 text-green-800 border border-green-200' : 'bg-red-100 text-red-800 border border-red-200'" class="px-2.5 py-0.5 text-[10px] font-bold rounded-full uppercase">
+                        {{ user.STATUS === 'aktif' ? 'Aktif' : 'Tidak Aktif' }}
+                      </span>
+                    </td>
+                    <td class="px-4 py-3 text-gray-500">{{ user.CREATED_AT }}</td>
+                    <td class="px-4 py-3 text-center space-x-2">
+                      <template v-if="user.EMAIL === 'almunzir2@gmail.com'">
+                        <span class="text-gray-400 italic text-[11px]">Protected</span>
+                      </template>
+                      <template v-else>
+                        <div class="space-x-2">
+                          <button @click="openModal('edit', user)" class="text-indigo-600 hover:text-indigo-900 bg-indigo-50 hover:bg-indigo-100 px-2.5 py-1 rounded-md font-medium transition">Edit</button>
+                          <button @click="openDeleteModal(user)" class="text-red-600 hover:text-red-900 bg-red-50 hover:bg-red-100 px-2.5 py-1 rounded-md font-medium transition">Hapus</button>
+                        </div>
+                      </template>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <!-- Footer Pagination -->
+            <div class="mt-4 pt-4 border-t border-gray-100 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs">
+              <div class="text-gray-500 font-medium">
+                Halaman {{ currentPage }} dari {{ totalPages || 1 }}
+              </div>
+
+              <div class="flex items-center space-x-1">
+                <button @click="changePage(currentPage - 1)" :disabled="currentPage === 1" class="px-3 py-1.5 border border-gray-300 rounded-lg bg-white text-gray-600 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition">‹</button>
+
+                <template v-for="page in displayedPages" :key="page">
+                  <span v-if="page === '...'" class="px-3 py-1.5 text-gray-400 font-bold">...</span>
+                  <button v-else @click="changePage(page)" :class="currentPage === page ? 'bg-blue-600 text-white font-semibold shadow-sm' : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'" class="px-3 py-1.5 rounded-lg transition">{{ page }}</button>
+                </template>
+
+                <button @click="changePage(currentPage + 1)" :disabled="currentPage === totalPages || totalPages === 0" class="px-3 py-1.5 border border-gray-300 rounded-lg bg-white text-gray-600 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition">›</button>
+              </div>
+            </div>
+
+          </div>
+
+        </div>
+
+        <!-- MODAL FORM TAMBAH / EDIT USER -->
+        <div v-if="showModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+          <div class="bg-white rounded-xl shadow-xl w-full max-w-md overflow-hidden transform transition-all">
+            <div class="bg-blue-600 px-5 py-4 flex justify-between items-center text-white">
+              <h3 class="font-semibold text-sm">{{ isEditMode ? 'Edit User' : 'Tambah User Baru' }}</h3>
+              <button @click="closeModal" class="text-blue-100 hover:text-white text-lg font-bold">✕</button>
+            </div>
+
+            <form @submit.prevent="submitForm" class="p-5 space-y-4 text-xs">
+              <div>
+                <label class="block font-medium text-gray-700 mb-1">Nama Lengkap <span class="text-red-500">*</span></label>
+                <input v-model="form.NAMA" type="text" required placeholder="Masukkan nama..." class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none" />
+              </div>
+
+              <div>
+                <label class="block font-medium text-gray-700 mb-1">Email <span class="text-red-500">*</span></label>
+                <input v-model="form.EMAIL" type="email" required placeholder="contoh@domain.com" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none" />
+                <p v-if="emailError" class="text-red-500 text-[10px] mt-1">{{ emailError }}</p>
+              </div>
+
+              <div>
+                <label class="block font-medium text-gray-700 mb-1">Password <span class="text-red-500">*</span></label>
+                <input v-model="form.PASSWORD" type="password" required placeholder="••••••••" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none" />
+              </div>
+
+              <div>
+                <label class="block font-medium text-gray-700 mb-1">Level Pengguna <span class="text-red-500">*</span></label>
+                <select v-model="form.LEVEL" required class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none bg-white">
+                  <option value="user">User</option>
+                  <option value="admin">Admin</option>
+                </select>
+              </div>
+
+              <div>
+                <label class="block font-medium text-gray-700 mb-2">Status Akun <span class="text-red-500">*</span></label>
+                <div class="flex items-center space-x-6">
+                  <label class="flex items-center space-x-2 cursor-pointer">
+                    <input type="radio" v-model="form.STATUS" value="aktif" class="text-blue-600 focus:ring-blue-500" />
+                    <span>Aktif</span>
+                  </label>
+                  <label class="flex items-center space-x-2 cursor-pointer">
+                    <input type="radio" v-model="form.STATUS" value="tidak_aktif" class="text-blue-600 focus:ring-blue-500" />
+                    <span>Tidak Aktif</span>
+                  </label>
+                </div>
+              </div>
+
+              <div class="pt-3 flex justify-end space-x-2 border-t border-gray-100">
+                <button type="button" @click="closeModal" class="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg font-semibold hover:bg-gray-50 transition">Batal</button>
+                <button type="submit" :disabled="saving" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold shadow transition disabled:opacity-50 flex items-center space-x-1">
+                  <span v-if="saving" class="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin mr-1"></span>
+                  <span>{{ saving ? 'Menyimpan...' : 'Simpan' }}</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+
+        <!-- MODAL KONFIRMASI HAPUS KUSTOM -->
+        <div v-if="showDeleteModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+          <div class="bg-white rounded-xl shadow-xl w-full max-w-sm overflow-hidden p-6 text-center space-y-4">
+            <div class="w-12 h-12 bg-red-100 text-red-600 rounded-full flex items-center justify-center mx-auto text-xl font-bold">
+              ⚠️
+            </div>
+            <div>
+              <h3 class="font-semibold text-sm text-gray-900">Konfirmasi Hapus</h3>
+              <p class="text-xs text-gray-600 mt-1">Apakah Anda yakin ingin menghapus user <span class="font-semibold text-gray-800">"{{ selectedUser ? selectedUser.NAMA : '' }}"</span>?</p>
+            </div>
+            <div class="flex justify-center space-x-2 pt-2">
+              <button @click="closeDeleteModal" class="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg text-xs font-semibold hover:bg-gray-50 transition">Batal</button>
+              <button @click="executeDelete" :disabled="deleting" class="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-xs font-semibold shadow transition disabled:opacity-50">
+                {{ deleting ? 'Menghapus...' : 'Ya, Hapus' }}
+              </button>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    `,
+    setup() {
+      const { ref, reactive, computed, onMounted } = Vue;
+
+      const users = ref([]);
+      const loading = ref(false);
+      const saving = ref(false);
+      const deleting = ref(false);
+      const showModal = ref(false);
+      const showDeleteModal = ref(false);
+      const isEditMode = ref(false);
+      const emailError = ref('');
+      const selectedUser = ref(null);
+
+      // Toast Notification State
+      const toast = reactive({
+        show: false,
+        message: '',
+        type: 'success'
+      });
+
+      const showToast = (message, type = 'success') => {
+        toast.message = message;
+        toast.type = type;
+        toast.show = true;
+        setTimeout(() => {
+          toast.show = false;
+        }, 3000);
+      };
+
+      const searchQuery = ref('');
+      const perPage = ref(5);
+      const currentPage = ref(1);
+
+      const form = reactive({
+        ID_USER: '',
+        NAMA: '',
+        EMAIL: '',
+        PASSWORD: '',
+        LEVEL: 'user',
+        STATUS: 'aktif'
+      });
+
+      const fetchUsers = () => {
+        loading.value = true;
+        if (typeof google !== 'undefined' && google.script) {
+          google.script.run
+            .withSuccessHandler((data) => {
+              users.value = data || [];
+              loading.value = false;
+            })
+            .withFailureHandler((err) => {
+              showToast('Gagal memuat data: ' + err.message, 'error');
+              loading.value = false;
+            })
+            .getUsers();
+        } else {
+          setTimeout(() => {
+            loading.value = false;
+          }, 300);
+        }
+      };
+
+      const filteredUsers = computed(() => {
+        if (!searchQuery.value) return users.value;
+        const q = searchQuery.value.toLowerCase();
+        return users.value.filter(u => 
+          (u.NAMA && u.NAMA.toLowerCase().includes(q)) || 
+          (u.EMAIL && u.EMAIL.toLowerCase().includes(q))
+        );
+      });
+
+      const totalPages = computed(() => Math.ceil(filteredUsers.value.length / perPage.value));
+      const startIndex = computed(() => (currentPage.value - 1) * perPage.value);
+      const paginatedUsers = computed(() => filteredUsers.value.slice(startIndex.value, startIndex.value + perPage.value));
+
+      const paginationInfo = computed(() => {
+        const total = filteredUsers.value.length;
+        if (total === 0) return 'Menampilkan 0 data';
+        const start = startIndex.value + 1;
+        const end = Math.min(startIndex.value + perPage.value, total);
+        return `Menampilkan ${start} - ${end} dari ${total} data`;
+      });
+
+      const displayedPages = computed(() => {
+        const total = totalPages.value;
+        const current = currentPage.value;
+        if (total <= 5) return Array.from({ length: total }, (_, i) => i + 1);
+        if (current <= 3) return [1, 2, 3, 4, '...', total];
+        if (current >= total - 2) return [1, '...', total - 3, total - 2, total - 1, total];
+        return [1, '...', current - 1, current, current + 1, '...', total];
+      });
+
+      const changePage = (page) => {
+        if (page >= 1 && page <= totalPages.value) currentPage.value = page;
+      };
+
+      const openModal = (mode, user = null) => {
+        emailError.value = '';
+        if (mode === 'edit' && user) {
+          isEditMode.value = true;
+          Object.assign(form, user);
+        } else {
+          isEditMode.value = false;
+          Object.assign(form, { ID_USER: '', NAMA: '', EMAIL: '', PASSWORD: '', LEVEL: 'user', STATUS: 'aktif' });
+        }
+        showModal.value = true;
+      };
+
+      const closeModal = () => { showModal.value = false; };
+
+      const validateEmail = (email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+
+      const submitForm = () => {
+        if (!validateEmail(form.EMAIL)) {
+          emailError.value = 'Format email tidak valid!';
+          return;
+        }
+
+        saving.value = true;
+        if (typeof google !== 'undefined' && google.script) {
+          google.script.run
+            .withSuccessHandler((res) => {
+              saving.value = false;
+              if (res.success) {
+                closeModal();
+                fetchUsers();
+                showToast(res.message, 'success');
+              } else {
+                showToast(res.message, 'error');
+              }
+            })
+            .withFailureHandler((err) => {
+              saving.value = false;
+              showToast('Gagal menyimpan: ' + err.message, 'error');
+            })
+            .saveUser(form);
+        }
+      };
+
+      // Modal Konfirmasi Hapus Kustom
+      const openDeleteModal = (user) => {
+        selectedUser.value = user;
+        showDeleteModal.value = true;
+      };
+
+      const closeDeleteModal = () => {
+        showDeleteModal.value = false;
+        selectedUser.value = null;
+      };
+
+      const executeDelete = () => {
+        if (!selectedUser.value) return;
+        deleting.value = true;
+
+        if (typeof google !== 'undefined' && google.script) {
+          google.script.run
+            .withSuccessHandler((res) => {
+              deleting.value = false;
+              closeDeleteModal();
+              if (res.success) {
+                fetchUsers();
+                showToast(res.message, 'success');
+              } else {
+                showToast(res.message, 'error');
+              }
+            })
+            .withFailureHandler((err) => {
+              deleting.value = false;
+              closeDeleteModal();
+              showToast('Gagal menghapus: ' + err.message, 'error');
+            })
+            .deleteUser(selectedUser.value.ID_USER);
+        }
+      };
+
+      onMounted(() => { fetchUsers(); });
+
+      return {
+        users, loading, saving, deleting, showModal, showDeleteModal, isEditMode, form, emailError,
+        searchQuery, perPage, currentPage, totalPages, startIndex, paginatedUsers, paginationInfo,
+        displayedPages, toast, changePage, openModal, closeModal, submitForm,
+        openDeleteModal, closeDeleteModal, executeDelete, fetchUsers, selectedUser
+      };
+    }
+  };
+</script>

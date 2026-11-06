@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SIMANDOR - Sistem Informasi Monitoring Kinerja dan Honor</title>
+  
+  <!-- FAVICON APLIKASI -->
+  <link rel="icon" type="image/png" href="https://lh3.googleusercontent.com/d/1C4qrN0Gqck_xUcdFaLR0-J8RRiDnLAPA" />
+
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  
+  <!-- Vue.js 3 CDN -->
+  <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+</head>
+<body class="bg-[#f1f5f9] font-sans">
+
+  <div id="app" class="flex min-h-screen w-full overflow-x-hidden">
+    
+    <!-- Sidebar -->
+    <?!= include('Sidebar'); ?>
+
+    <!-- Main Content Wrapper -->
+    <div class="flex-1 flex flex-col h-screen overflow-y-auto min-w-0 w-full">
+      
+      <!-- Top Header (Sticky) -->
+      <header class="bg-white shadow-sm px-6 py-4 flex justify-between items-center border-b border-gray-100 sticky top-0 z-40 flex-shrink-0">
+        <div class="flex items-center space-x-4">
+          <button @click="toggleSidebar" class="md:hidden text-gray-600 hover:text-gray-800 focus:outline-none">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16"></path>
+            </svg>
+          </button>
+          
+          <div class="text-xs text-gray-400 font-medium">
+            Application <span class="mx-1">/</span> <span class="text-blue-600 capitalize font-semibold">{{ currentMenu.replace('_', ' ') }}</span>
+          </div>
+        </div>
+
+        <div class="hidden md:flex text-sm font-medium text-gray-600 bg-gray-50 px-3 py-1.5 rounded-lg border border-gray-200 shadow-inner items-center space-x-1.5">
+          <span>🕒</span>
+          <span>{{ currentTime }}</span>
+        </div>
+      </header>
+
+      <!-- Main Content Area -->
+      <div class="flex-1 flex flex-col justify-between w-full">
+        <main class="p-4 sm:p-6 w-full">
+          <keep-alive>
+            <component :is="'page-' + currentMenu"></component>
+          </keep-alive>
+        </main>
+
+        <footer class="bg-white border-t border-gray-100 py-4 px-6 text-center text-xs text-gray-500 flex-shrink-0">
+          <span>Copyright &copy; 2026 - {{ currentYear }} SIMANDOR. All rights reserved.</span>
+        </footer>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Memuat Komponen Modular dari File Terpisah (GAS Include) -->
+  <?!= include('Page_Beranda'); ?>
+  <?!= include('Page_Admin'); ?>
+  <?!= include('Page_User'); ?>
+  <?!= include('Page_Tahun'); ?>
+  <?!= include('Page_Tim'); ?>
+  <?!= include('Page_Kegiatan'); ?>
+
+  <!-- Inisialisasi Vue.js Utama -->
+  <script>
+    const { createApp, ref, onMounted, onUnmounted } = Vue;
+
+    const app = createApp({
+      setup() {
+        const currentMenu = ref('beranda'); // Menu default awal
+        const currentTime = ref('');
+        const isSidebarOpen = ref(false);
+        const currentYear = ref(new Date().getFullYear());
+        let timer = null;
+
+        const toggleSidebar = () => {
+          isSidebarOpen.value = !isSidebarOpen.value;
+        };
+
+        const toggleMobileSidebar = () => {
+          if (window.innerWidth < 768) {
+            isSidebarOpen.value = false;
+          }
+        };
+
+        const updateClock = () => {
+          const now = new Date();
+          const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' };
+          currentTime.value = now.toLocaleDateString('id-ID', options) + ' WIB';
+        };
+
+        onMounted(() => {
+          updateClock();
+          timer = setInterval(updateClock, 1000);
+        });
+
+        onUnmounted(() => {
+          clearInterval(timer);
+        });
+
+        return {
+          currentMenu,
+          currentTime,
+          isSidebarOpen,
+          currentYear,
+          toggleSidebar,
+          toggleMobileSidebar
+        };
+      }
+    });
+
+    // Mendaftarkan komponen Vue
+    app.component('page-beranda', PageBeranda);
+    app.component('page-admin', PageAdmin);
+    app.component('page-user', PageUser);
+    app.component('page-tahun', PageTahun);
+    app.component('page-tim', PageTim);
+    app.component('page-kegiatan', PageKegiatan);
+
+    app.mount('#app');
+  </script>
+
+</body>
+</html>
