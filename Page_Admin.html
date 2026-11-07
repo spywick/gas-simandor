@@ -6,7 +6,7 @@
         <div class="bg-white border border-gray-100 rounded-xl p-4 shadow-sm flex flex-wrap items-center justify-between gap-4">
           <div>
             <h3 class="text-sm font-semibold text-gray-900">Panel Admin Sistem</h3>
-            <p class="text-xs text-gray-600 mt-0.5">Pusat pengelolaan data master pengguna, tahun, dan tim kerja.</p>
+            <p class="text-xs text-gray-600 mt-0.5">Pusat pengelolaan data master pengguna, tahun, tim kerja, dan lain-lain.</p>
           </div>
           
           <!-- Tombol Pilihan Tab -->
@@ -25,6 +25,11 @@
               :class="activeTab === 'tim' ? 'bg-white hover:bg-blue-50 border border-blue-200 text-blue-600 shadow-sm' : 'text-gray-600 hover:text-gray-900 border border-gray-200'"
               class="px-4 py-2  transition">
               Tim
+            </button>
+            <button @click="activeTab = 'satuan'" 
+              :class="activeTab === 'satuan' ? 'bg-white hover:bg-blue-50 border border-blue-200 text-blue-600 shadow-sm' : 'text-gray-600 hover:text-gray-900 border border-gray-200'"
+              class="px-4 py-2  transition">
+              Satuan
             </button>
           </div>
         </div>
