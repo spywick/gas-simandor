@@ -37,7 +37,8 @@
           <hr class="border-gray-100">
 
           <!-- Kontrol Atas Tabel (Filter & Pencarian) -->
-          <div class="p-4 sm:p-5 bg-gray-50/50 border-b border-gray-100 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 text-xs">
+          <div class="p-4 sm:p-5 bg-gray-50/50 border-b border-gray-100 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 text-xs">
+            <!-- Pilihan Jumlah Per Halaman -->
             <div class="flex items-center space-x-2 text-gray-600">
               <span>Tampilkan</span>
               <select v-model.number="perPage" @change="currentPage = 1" class="border border-gray-300 rounded-lg px-2.5 py-1.5 bg-white focus:ring-2 focus:ring-blue-500 focus:outline-none font-medium">
@@ -49,9 +50,27 @@
               <span>data per halaman</span>
             </div>
 
-            <div class="w-full md:w-72 relative">
-              <span class="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-gray-400">🔍</span>
-              <input v-model="searchQuery" @input="currentPage = 1" type="text" placeholder="Cari nama atau email..." class="w-full pl-9 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none bg-white" />
+            <!-- FITUR A: Filter Level, Filter Status & Search Bar -->
+            <div class="w-full lg:w-auto flex flex-col sm:flex-row items-center gap-2.5">
+              <!-- Filter Level -->
+              <select v-model="filterLevel" @change="currentPage = 1" class="w-full sm:w-auto px-3 py-2 bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                <option value="">Semua Level</option>
+                <option value="admin">Admin</option>
+                <option value="user">User</option>
+              </select>
+
+              <!-- Filter Status -->
+              <select v-model="filterStatus" @change="currentPage = 1" class="w-full sm:w-auto px-3 py-2 bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                <option value="">Semua Status</option>
+                <option value="aktif">Aktif</option>
+                <option value="tidak_aktif">Tidak Aktif</option>
+              </select>
+
+              <!-- Input Pencarian -->
+              <div class="w-full sm:w-64 relative">
+                <span class="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-gray-400">🔍</span>
+                <input v-model="searchQuery" @input="currentPage = 1" type="text" placeholder="Cari nama atau email..." class="w-full pl-9 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none bg-white" />
+              </div>
             </div>
           </div>
 
@@ -75,6 +94,7 @@
                   </tr>
                 </thead>
                 <tbody class="divide-y divide-gray-200 bg-white">
+                  <!-- Loading State -->
                   <tr v-if="loading">
                     <td colspan="7" class="px-4 py-8 text-center text-gray-400">
                       <div class="inline-block w-6 h-6 border-2 border-blue-600 border-t-transparent rounded-full animate-spin mr-2"></div>
@@ -82,13 +102,40 @@
                     </td>
                   </tr>
 
+                  <!-- FITUR D: State Kosong (Empty State yang Disempurnakan) -->
                   <tr v-else-if="paginatedUsers.length === 0">
-                    <td colspan="7" class="px-4 py-8 text-center text-gray-400">Tidak ada data User yang ditemukan.</td>
+                    <td colspan="7" class="px-4 py-12 text-center">
+                      <div class="flex flex-col items-center justify-center space-y-2">
+                        <div class="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center text-gray-400">
+                          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"/></svg>
+                        </div>
+                        <p class="font-medium text-gray-700">
+                          {{ users.length === 0 ? 'Belum ada data user.' : 'Tidak ada data user yang sesuai dengan pencarian atau filter.' }}
+                        </p>
+                        <p class="text-[11px] text-gray-400">
+                          {{ users.length === 0 ? 'Silakan tambahkan user baru melalui tombol di atas.' : 'Coba ubah kata kunci pencarian atau reset filter.' }}
+                        </p>
+                        <button v-if="users.length > 0 && (searchQuery || filterLevel || filterStatus)" @click="resetFilter" class="mt-2 px-3 py-1 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-md font-medium transition">
+                          Reset Filter
+                        </button>
+                      </div>
+                    </td>
                   </tr>
 
+                  <!-- Data Row -->
                   <tr v-else v-for="(user, index) in paginatedUsers" :key="user.ID_USER" class="hover:bg-gray-50 transition">
                     <td class="px-4 py-3 text-gray-500 font-medium">{{ startIndex + index + 1 }}</td>
-                    <td class="px-4 py-3 font-medium text-gray-900">{{ user.NAMA }}</td>
+                    
+                    <!-- FITUR C: Avatar Inisial Nama -->
+                    <td class="px-4 py-3">
+                      <div class="flex items-center space-x-3">
+                        <div class="w-8 h-8 rounded-full bg-blue-100 text-blue-700 font-bold flex items-center justify-center text-xs flex-shrink-0">
+                          {{ getInitials(user.NAMA) }}
+                        </div>
+                        <span class="font-medium text-gray-900">{{ user.NAMA }}</span>
+                      </div>
+                    </td>
+
                     <td class="px-4 py-3 text-gray-600">{{ user.EMAIL }}</td>
                     <td class="px-4 py-3">
                       <span :class="user.LEVEL === 'admin' ? 'bg-purple-100 text-purple-800 border border-purple-200' : 'bg-blue-100 text-blue-800 border border-blue-200'" class="px-2.5 py-0.5 text-[10px] font-bold rounded-full capitalize">
@@ -247,7 +294,10 @@
         }, 3000);
       };
 
+      // State Filter & Pagination
       const searchQuery = ref('');
+      const filterLevel = ref('');
+      const filterStatus = ref('');
       const perPage = ref(5);
       const currentPage = ref(1);
 
@@ -259,6 +309,24 @@
         LEVEL: 'user',
         STATUS: 'aktif'
       });
+
+      // Helper pembuat inisial nama untuk Avatar
+      const getInitials = (name) => {
+        if (!name) return 'U';
+        const parts = name.trim().split(' ');
+        if (parts.length >= 2) {
+          return (parts[0][0] + parts[1][0]).toUpperCase();
+        }
+        return name.substring(0, 2).toUpperCase();
+      };
+
+      // Reset filter
+      const resetFilter = () => {
+        searchQuery.value = '';
+        filterLevel.value = '';
+        filterStatus.value = '';
+        currentPage.value = 1;
+      };
 
       const fetchUsers = () => {
         loading.value = true;
@@ -280,15 +348,21 @@
         }
       };
 
+      // Filtering gabungan (Search + Level + Status)
       const filteredUsers = computed(() => {
-        if (!searchQuery.value) return users.value;
-        const q = searchQuery.value.toLowerCase();
-        return users.value.filter(u => 
-          (u.NAMA && u.NAMA.toLowerCase().includes(q)) || 
-          (u.EMAIL && u.EMAIL.toLowerCase().includes(q))
-        );
+        return users.value.filter(user => {
+          const q = searchQuery.value.toLowerCase();
+          const matchSearch = !q || 
+                              (user.NAMA && user.NAMA.toLowerCase().includes(q)) || 
+                              (user.EMAIL && user.EMAIL.toLowerCase().includes(q));
+          const matchLevel = filterLevel.value === '' || user.LEVEL === filterLevel.value;
+          const matchStatus = filterStatus.value === '' || user.STATUS === filterStatus.value;
+          
+          return matchSearch && matchLevel && matchStatus;
+        });
       });
 
+      // Computed Pagination
       const totalPages = computed(() => Math.ceil(filteredUsers.value.length / perPage.value));
       const startIndex = computed(() => (currentPage.value - 1) * perPage.value);
       const paginatedUsers = computed(() => filteredUsers.value.slice(startIndex.value, startIndex.value + perPage.value));
@@ -397,8 +471,8 @@
 
       return {
         users, loading, saving, deleting, showModal, showDeleteModal, isEditMode, form, emailError,
-        searchQuery, perPage, currentPage, totalPages, startIndex, paginatedUsers, paginationInfo,
-        displayedPages, toast, changePage, openModal, closeModal, submitForm,
+        searchQuery, filterLevel, filterStatus, perPage, currentPage, totalPages, startIndex, paginatedUsers, paginationInfo,
+        displayedPages, toast, getInitials, resetFilter, changePage, openModal, closeModal, submitForm,
         openDeleteModal, closeDeleteModal, executeDelete, fetchUsers, selectedUser
       };
     }
