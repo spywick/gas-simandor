@@ -68,6 +68,8 @@
   <?!= include('Page_Tim'); ?>
   <?!= include('Page_Kegiatan'); ?>
   <?!= include('Page_Satuan'); ?>
+  <?!= include('Page_Pegawai'); ?>
+  <?!= include('Page_Tim_Anggota'); ?>
 
   <!-- Inisialisasi Vue.js Utama -->
   <script>
@@ -125,6 +127,8 @@
     app.component('page-tim', PageTim);
     app.component('page-kegiatan', PageKegiatan);
     app.component('page-satuan', PageSatuan);
+    app.component('page-pegawai', PagePegawai);
+    app.component('page-tim_anggota', PageTimAnggota);
 
     app.mount('#app');
   </script>

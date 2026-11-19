@@ -1,0 +1,644 @@
+<script>
+  const PageTimAnggota = {
+    template: `
+      <!-- Wadah utama -->
+      <div class="space-y-6">
+        
+        <!-- Toast Notifikasi Melayang -->
+        <div v-if="toast.show" :class="toast.type === 'success' ? 'bg-green-600' : 'bg-red-600'" class="fixed top-5 right-5 z-50 text-white px-4 py-3 rounded-xl shadow-lg flex items-center space-x-2 text-xs transition-all duration-300">
+          <span>{{ toast.type === 'success' ? '✅' : '⚠️' }}</span>
+          <span class="font-medium">{{ toast.message }}</span>
+        </div>
+
+        <!-- Kartu Utama Master Tim Anggota -->
+        <div class="bg-white border border-gray-100 rounded-xl shadow-sm overflow-hidden">
+          
+          <!-- Header Card & Tombol Aksi -->
+          <div class="p-4 sm:p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div>
+              <h3 class="text-sm font-semibold text-gray-900">Kelola Anggota Tim</h3>
+              <p class="text-xs text-gray-600 mt-0.5">Kelola penugasan pegawai (Ketua / Anggota) ke dalam tim kerja berdasarkan tahun anggaran.</p>
+            </div>
+            
+            <div class="flex items-center space-x-2">
+              <!-- Tombol Batch Delete (Hanya muncul jika ada baris yang dicentang) -->
+              <button v-if="selectedIds.length > 0" @click="openBatchDeleteModal" class="bg-red-600 hover:bg-red-700 text-white px-3 py-2 rounded-lg text-xs font-semibold shadow transition flex items-center space-x-1">
+                <span>🗑️ Hapus Terpilih ({{ selectedIds.length }})</span>
+              </button>
+              <button @click="fetchData" :disabled="loading" class="bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-2 rounded-lg text-xs font-semibold shadow-sm transition flex items-center space-x-1 disabled:opacity-50" title="Muat ulang data">
+                <svg :class="{'animate-spin': loading}" class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                </svg>
+                <span>Refresh</span>
+              </button>
+              
+              <button @click="openModal('create')" class="bg-blue-600 hover:bg-blue-700 text-white px-3.5 py-2 rounded-lg text-xs font-semibold shadow transition flex items-center space-x-1.5 flex-shrink-0">
+                <span>+ Tambah Anggota Tim</span>
+              </button>
+            </div>
+          </div>
+
+          <hr class="border-gray-100">
+
+          <!-- Kontrol Atas Tabel (Filter & Pencarian) -->
+          <div class="p-4 sm:p-5 bg-gray-50/50 border-b border-gray-100 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 text-xs">
+            <div class="flex items-center space-x-2 text-gray-600">
+              <span>Tampilkan</span>
+              <select v-model.number="perPage" @change="currentPage = 1" class="border border-gray-300 rounded-lg px-2.5 py-1.5 bg-white focus:ring-2 focus:ring-blue-500 focus:outline-none font-medium">
+                <option :value="5">5</option>
+                <option :value="10">10</option>
+                <option :value="25">25</option>
+                <option :value="50">50</option>
+              </select>
+              <span>data per halaman</span>
+            </div>
+
+            <!-- Search Input -->
+            <div class="w-full lg:w-64 relative">
+              <span class="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-gray-400">🔍</span>
+              <input v-model="searchQuery" @input="currentPage = 1" type="text" placeholder="Cari nama, tim, tahun, atau peran..." class="w-full pl-9 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none bg-white" />
+            </div>
+          </div>
+
+          <div class="px-4 sm:px-6 pt-4 text-xs text-gray-500 font-medium flex justify-between items-center">
+            <span>{{ paginationInfo }}</span>
+          </div>
+
+          <!-- Tabel Data Anggota Tim -->
+          <div class="p-4 sm:p-6 pt-2">
+            <div class="overflow-x-auto">
+              <table class="min-w-full divide-y divide-gray-200 text-xs">
+                <thead class="bg-gray-50 text-gray-500 uppercase font-semibold">
+                  <tr>
+                    <th class="px-4 py-3 text-center w-10">
+                      <input type="checkbox" @change="toggleSelectAll" :checked="isAllSelected" class="rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer" />
+                    </th>
+                    <th class="px-4 py-3 text-left">No</th>
+                    <th class="px-4 py-3 text-left">Tahun Anggaran</th>
+                    <th class="px-4 py-3 text-left">Nama Tim</th>
+                    <th class="px-4 py-3 text-left">Nama Pegawai</th>
+                    <th class="px-4 py-3 text-left">Peran</th>
+                    <th class="px-4 py-3 text-left">Keterangan</th>
+                    <th class="px-4 py-3 text-center">Aksi</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-200 bg-white">
+                  <!-- Loading State -->
+                  <tr v-if="loading">
+                    <td colspan="7" class="px-4 py-8 text-center text-gray-400">
+                      <div class="inline-block w-6 h-6 border-2 border-blue-600 border-t-transparent rounded-full animate-spin mr-2"></div>
+                      Memuat data anggota tim...
+                    </td>
+                  </tr>
+
+                  <!-- State Kosong -->
+                  <tr v-else-if="paginatedList.length === 0">
+                    <td colspan="7" class="px-4 py-12 text-center">
+                      <div class="flex flex-col items-center justify-center space-y-2">
+                        <div class="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center text-gray-400">
+                          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"/></svg>
+                        </div>
+                        <p class="font-medium text-gray-700">
+                          {{ timAnggotaList.length === 0 ? 'Belum ada data anggota tim.' : 'Tidak ada data yang sesuai dengan pencarian.' }}
+                        </p>
+                        <button v-if="timAnggotaList.length > 0 && searchQuery" @click="searchQuery = ''" class="mt-2 px-3 py-1 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-md font-medium transition">
+                          Reset Pencarian
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+
+                  <!-- Data Row -->
+                  <tr v-else v-for="(item, index) in paginatedList" :key="item.ID_DETAIL_TIM" class="hover:bg-gray-50 transition">
+                    <td class="px-4 py-3 text-center">
+                      <input type="checkbox" v-model="selectedIds" :value="item.ID_DETAIL_TIM" class="rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer" />
+                    </td>
+                    <td class="px-4 py-3 text-gray-500 font-medium">{{ startIndex + index + 1 }}</td>
+                    <td class="px-4 py-3 text-gray-900 font-semibold">{{ item.TAHUN_LABEL }}</td>
+                    <td class="px-4 py-3 text-gray-800 font-medium">{{ item.TIM_LABEL }}</td>
+                    <td class="px-4 py-3 text-gray-900 font-medium">{{ item.PEGAWAI_LABEL }}</td>
+                    <td class="px-4 py-3">
+                      <span :class="item.PERAN === 'Ketua' ? 'bg-purple-50 text-purple-700 border border-purple-200' : 'bg-blue-50 text-blue-700 border border-blue-200'" class="px-2.5 py-0.5 text-[10px] font-bold rounded-full">
+                        {{ item.PERAN || 'Anggota' }}
+                      </span>
+                    </td>
+                    <td class="px-4 py-3 text-gray-600">{{ item.KETERANGAN || '-' }}</td>
+
+                    <!-- Aksi -->
+                    <td class="px-4 py-3 text-center space-x-1">
+                      <button @click="openModal('edit', item)" class="text-indigo-600 hover:text-indigo-900 bg-indigo-50 hover:bg-indigo-100 px-2.5 py-1 rounded-md font-medium transition">Edit</button>
+                      <button @click="openDeleteModal(item)" class="text-red-600 hover:text-red-900 bg-red-50 hover:bg-red-100 px-2.5 py-1 rounded-md font-medium transition">Hapus</button>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <!-- Footer Pagination -->
+            <div class="mt-4 pt-4 border-t border-gray-100 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs">
+              <div class="text-gray-500 font-medium">
+                Halaman {{ currentPage }} dari {{ totalPages || 1 }}
+              </div>
+
+              <div class="flex items-center space-x-1">
+                <button @click="changePage(currentPage - 1)" :disabled="currentPage === 1" class="px-3 py-1.5 border border-gray-300 rounded-lg bg-white text-gray-600 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition">‹</button>
+
+                <template v-for="page in displayedPages" :key="page">
+                  <span v-if="page === '...'" class="px-3 py-1.5 text-gray-400 font-bold">...</span>
+                  <button v-else @click="changePage(page)" :class="currentPage === page ? 'bg-blue-600 text-white font-semibold shadow-sm' : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'" class="px-3 py-1.5 rounded-lg transition">{{ page }}</button>
+                </template>
+
+                <button @click="changePage(currentPage + 1)" :disabled="currentPage === totalPages || totalPages === 0" class="px-3 py-1.5 border border-gray-300 rounded-lg bg-white text-gray-600 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition">›</button>
+              </div>
+            </div>
+
+          </div>
+
+        </div>
+
+        <!-- MODAL FORM TAMBAH / EDIT ANGGOTA TIM -->
+        <div v-if="showModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm overflow-y-auto">
+          <div class="bg-white rounded-xl shadow-xl w-full max-w-lg overflow-hidden my-8 transform transition-all">
+            <div class="bg-blue-600 px-5 py-4 flex justify-between items-center text-white">
+              <h3 class="font-semibold text-sm">{{ isEditMode ? 'Edit Anggota Tim' : 'Tambah Anggota Tim Baru' }}</h3>
+              <button @click="closeModal" class="text-white/80 hover:text-white text-lg font-bold">✕</button>
+            </div>
+
+            <form @submit.prevent="submitForm" class="p-5 space-y-4 text-xs">
+              <div class="space-y-3">
+                
+                <!-- Tahun Anggaran (Select dari Master Tahun) -->
+                <div>
+                  <label class="block font-medium text-gray-700 mb-1">Tahun Anggaran <span class="text-red-500">*</span></label>
+                  <select v-model="form.TAHUN_ID" @change="onTahunChange" required class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none bg-white">
+                    <option value="">-- Pilih Tahun Anggaran --</option>
+                    <option v-for="thn in masterData.tahunList" :value="thn.ID_TAHUN">{{ thn.TAHUN }}</option>
+                  </select>
+                </div>
+
+                <!-- Tim Kerja (Dependent Dropdown berdasarkan Tahun yang dipilih) -->
+                <div>
+                  <label class="block font-medium text-gray-700 mb-1">Nama Tim Kerja <span class="text-red-500">*</span></label>
+                  <select v-model="form.TIM_ID" :disabled="!form.TAHUN_ID" required class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none bg-white disabled:bg-gray-100 disabled:cursor-not-allowed">
+                    <option value="">-- Pilih Tim Kerja --</option>
+                    <option v-for="tim in filteredTimList" :value="tim.ID_TIM">{{ tim.NAMA_TIM }}</option>
+                  </select>
+                  <p v-if="!form.TAHUN_ID" class="text-[11px] text-gray-400 mt-1">Pilih Tahun Anggaran terlebih dahulu.</p>
+                </div>
+
+                <!-- Peran -->
+                <div>
+                  <label class="block font-medium text-gray-700 mb-1">Peran dalam Tim <span class="text-red-500">*</span></label>
+                  <select v-model="form.PERAN" @change="onPeranChange" required class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none bg-white">
+                    <option value="Anggota">Anggota</option>
+                    <option value="Ketua">Ketua</option>
+                  </select>
+                </div>
+
+                <!-- Pegawai (Custom Multi-Select dengan Search & Tags) -->
+                <div>
+                  <label class="block font-medium text-gray-700 mb-1">
+                    Pegawai (Status Aktif) 
+                    <span v-if="!isEditMode && form.PERAN === 'Anggota'" class="text-[10px] text-blue-600 font-normal">(Bisa pilih lebih dari satu)</span>
+                    <span class="text-red-500">*</span>
+                  </label>
+
+                  <!-- Jika Mode Edit atau Peran Ketua: Gunakan Select Tunggal standar berurutan abjad -->
+                  <select v-if="isEditMode || form.PERAN === 'Ketua'" v-model="form.PEGAWAI_ID" required class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none bg-white">
+                    <option value="">-- Pilih Pegawai --</option>
+                    <option v-for="pgw in sortedPegawaiList" :value="pgw.ID_PEGAWAI">
+                      {{ pgw.NAMA_PEGAWAI }} (NIP: {{ pgw.NIP }})
+                    </option>
+                  </select>
+
+                  <!-- Jika Mode Tambah & Peran Anggota: Custom Multi-Select Search & Tags -->
+                  <div v-else class="relative border border-gray-300 rounded-lg bg-white p-2 space-y-2">
+                    <!-- Area Badges / Tags yang terpilih -->
+                    <div class="flex flex-wrap gap-1.5 min-h-[30px] items-center">
+                      <span v-if="form.PEGAWAI_ID.length === 0" class="text-gray-400 text-[11px] px-1">Pilih pegawai dari daftar di bawah...</span>
+                      <span v-for="id in form.PEGAWAI_ID" :key="id" class="inline-flex items-center bg-blue-50 text-blue-700 border border-blue-200 px-2 py-0.5 rounded-md text-[11px] font-medium">
+                        {{ getPegawaiName(id) }}
+                        <button type="button" @click="removeSelectedPegawai(id)" class="ml-1.5 text-blue-400 hover:text-blue-700 font-bold">×</button>
+                      </span>
+                    </div>
+
+                    <!-- Kotak Pencarian / Search Bar -->
+                    <div class="relative border-t border-gray-100 pt-2">
+                      <input v-model="pgwSearchQuery" type="text" placeholder="🔍 Ketik nama pegawai untuk mencari..." class="w-full px-3 py-1.5 bg-gray-50 border border-gray-200 rounded-md focus:ring-1 focus:ring-blue-500 focus:outline-none text-xs" />
+                    </div>
+
+                    <!-- Daftar Opsi dengan Scrollbar -->
+                    <div class="max-h-40 overflow-y-auto space-y-0.5 divide-y divide-gray-50 border border-gray-100 rounded-md p-1 bg-white">
+                      <div v-for="pgw in filteredDropdownPegawai" :key="pgw.ID_PEGAWAI" 
+                           @click="toggleSelectPegawai(pgw.ID_PEGAWAI)" 
+                           :class="form.PEGAWAI_ID.includes(pgw.ID_PEGAWAI) ? 'bg-blue-50 text-blue-700 font-semibold' : 'hover:bg-gray-50 text-gray-700'"
+                           class="px-2.5 py-1.5 rounded text-xs cursor-pointer flex items-center justify-between transition">
+                        <span>{{ pgw.NAMA_PEGAWAI }} <span class="text-[10px] text-gray-400 font-normal">(NIP: {{ pgw.NIP }})</span></span>
+                        <span v-if="form.PEGAWAI_ID.includes(pgw.ID_PEGAWAI)" class="text-blue-600 font-bold">✓</span>
+                      </div>
+                      <div v-if="filteredDropdownPegawai.length === 0" class="p-2 text-center text-gray-400 text-[11px]">
+                        Pegawai tidak ditemukan
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Keterangan -->
+                <div>
+                  <label class="block font-medium text-gray-700 mb-1">Keterangan (Opsional)</label>
+                  <textarea v-model="form.KETERANGAN" rows="2" placeholder="Catatan tambahan penugasan..." class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none"></textarea>
+                </div>
+
+              </div>
+
+              <div class="pt-3 flex justify-end space-x-2 border-t border-gray-100">
+                <button type="button" @click="closeModal" class="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg font-semibold hover:bg-gray-50 transition">Batal</button>
+                <button type="submit" :disabled="saving" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold shadow transition disabled:opacity-50 flex items-center space-x-1">
+                  <span v-if="saving" class="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin mr-1"></span>
+                  <span>{{ saving ? 'Menyimpan...' : 'Simpan' }}</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+
+        <!-- MODAL KONFIRMASI HAPUS -->
+        <div v-if="showDeleteModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+          <div class="bg-white rounded-xl shadow-xl w-full max-w-sm overflow-hidden p-6 text-center space-y-4">
+            <div class="w-12 h-12 bg-red-100 text-red-600 rounded-full flex items-center justify-center mx-auto text-xl font-bold">⚠️</div>
+            <div>
+              <h3 class="font-semibold text-sm text-gray-900">Konfirmasi Hapus</h3>
+              <p class="text-xs text-gray-600 mt-1">Apakah Anda yakin ingin menghapus penugasan anggota tim ini?</p>
+            </div>
+            <div class="flex justify-center space-x-2 pt-2">
+              <button @click="closeDeleteModal" class="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg text-xs font-semibold hover:bg-gray-50 transition">Batal</button>
+              <button @click="executeDelete" :disabled="deleting" class="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-xs font-semibold shadow transition disabled:opacity-50">
+                {{ deleting ? 'Menghapus...' : 'Ya, Hapus' }}
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- MODAL KONFIRMASI BATCH DELETE -->
+        <div v-if="showBatchDeleteModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+          <div class="bg-white rounded-xl shadow-xl w-full max-w-sm overflow-hidden p-6 text-center space-y-4">
+            <div class="w-12 h-12 bg-red-100 text-red-600 rounded-full flex items-center justify-center mx-auto text-xl font-bold">⚠️</div>
+            <div>
+              <h3 class="font-semibold text-sm text-gray-900">Konfirmasi Hapus Massal</h3>
+              <p class="text-xs text-gray-600 mt-1">Apakah Anda yakin ingin menghapus <span class="font-semibold text-gray-800">{{ selectedIds.length }}</span> data anggota tim yang dipilih?</p>
+            </div>
+            <div class="flex justify-center space-x-2 pt-2">
+              <button @click="closeBatchDeleteModal" class="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg text-xs font-semibold hover:bg-gray-50 transition">Batal</button>
+              <button @click="executeBatchDelete" :disabled="deleting" class="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-xs font-semibold shadow transition disabled:opacity-50">
+                {{ deleting ? 'Menghapus...' : 'Ya, Hapus Semua' }}
+              </button>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    `,
+    setup() {
+      const { ref, reactive, computed, onMounted } = Vue;
+
+      const timAnggotaList = ref([]);
+      const masterData = reactive({
+        tahunList: [],
+        timList: [],
+        pegawaiList: []
+      });
+
+      const loading = ref(false);
+      const saving = ref(false);
+      const deleting = ref(false);
+      const showModal = ref(false);
+      const showDeleteModal = ref(false);
+      const isEditMode = ref(false);
+      const selectedItem = ref(null);
+
+      const toast = reactive({
+        show: false,
+        message: '',
+        type: 'success'
+      });
+
+      const showToast = (message, type = 'success') => {
+        toast.message = message;
+        toast.type = type;
+        toast.show = true;
+        setTimeout(() => { toast.show = false; }, 3000);
+      };
+
+      const searchQuery = ref('');
+      const perPage = ref(10);
+      const currentPage = ref(1);
+
+      const form = reactive({
+        ID_DETAIL_TIM: '',
+        TAHUN_ID: '',
+        TIM_ID: '',
+        PEGAWAI_ID: [],
+        PERAN: 'Anggota',
+        KETERANGAN: ''
+      });
+
+      // State untuk pencarian di dropdown pegawai
+      const pgwSearchQuery = ref('');
+
+      // Helper untuk menampilkan nama pegawai berdasarkan ID di badge
+      const getPegawaiName = (id) => {
+        const found = masterData.pegawaiList.find(p => p.ID_PEGAWAI === id);
+        return found ? found.NAMA_PEGAWAI : id;
+      };
+
+      // Fungsi memilih/membatalkan pilihan pegawai
+      const toggleSelectPegawai = (id) => {
+        if (!Array.isArray(form.PEGAWAI_ID)) form.PEGAWAI_ID = [];
+        const index = form.PEGAWAI_ID.indexOf(id);
+        if (index > -1) {
+          form.PEGAWAI_ID.splice(index, 1);
+        } else {
+          form.PEGAWAI_ID.push(id);
+        }
+      };
+
+      // Fungsi menghapus badge item terpilih
+      const removeSelectedPegawai = (id) => {
+        form.PEGAWAI_ID = form.PEGAWAI_ID.filter(item => item !== id);
+      };
+
+      // 1. Computed untuk mendapatkan daftar pegawai yang BELUM terdaftar pada Tahun & Tim yang dipilih
+      const availablePegawaiList = computed(() => {
+        // Jika Tahun atau Tim belum dipilih, kembalikan semua pegawai aktif
+        if (!form.TAHUN_ID || !form.TIM_ID) {
+          return masterData.pegawaiList;
+        }
+
+        // Cari semua PEGAWAI_ID yang sudah ada di Tahun & Tim tersebut
+        const existingPegawaiIds = timAnggotaList.value
+          .filter(item => 
+            item.TAHUN_ID === form.TAHUN_ID && 
+            item.TIM_ID === form.TIM_ID &&
+            // Jika mode edit, tetap izinkan pegawai yang sedang diedit muncul di pilihan
+            (!isEditMode.value || item.ID_DETAIL_TIM !== form.ID_DETAIL_TIM)
+          )
+          .map(item => item.PEGAWAI_ID);
+
+        // Kembalikan pegawai yang ID-nya belum ada di existingPegawaiIds
+        return masterData.pegawaiList.filter(pgw => !existingPegawaiIds.includes(pgw.ID_PEGAWAI));
+      });
+
+      // 2. Perbarui sortedPegawaiList (untuk select tunggal Ketua/Edit) agar menggunakan availablePegawaiList
+      const sortedPegawaiList = computed(() => {
+        return [...availablePegawaiList.value].sort((a, b) => {
+          return a.NAMA_PEGAWAI.localeCompare(b.NAMA_PEGAWAI, 'id', { sensitivity: 'base' });
+        });
+      });
+
+      // 3. Perbarui filteredDropdownPegawai (untuk multi-select Anggota) agar menggunakan sortedPegawaiList
+      const filteredDropdownPegawai = computed(() => {
+        const q = pgwSearchQuery.value.toLowerCase();
+        if (!q) return sortedPegawaiList.value;
+
+        return sortedPegawaiList.value.filter(p => 
+          p.NAMA_PEGAWAI.toLowerCase().includes(q) || 
+          String(p.NIP).toLowerCase().includes(q)
+        );
+      });
+
+      // Computed untuk dependent dropdown: filter tim berdasarkan TAHUN_ID yang dipilih di form
+      const filteredTimList = computed(() => {
+        if (!form.TAHUN_ID) return [];
+        return masterData.timList.filter(tim => tim.TAHUN_ID === form.TAHUN_ID);
+      });
+
+      const onTahunChange = () => {
+        form.TIM_ID = '';
+        form.PEGAWAI_ID = (isEditMode.value || form.PERAN === 'Ketua') ? '' : [];
+      };
+
+      const onTimChange = () => {
+        if (!isEditMode.value) {
+          form.PEGAWAI_ID = form.PERAN === 'Ketua' ? '' : [];
+        }
+      };
+
+      // Tambahkan fungsi ini di dalam setup() untuk mereset/menyesuaikan pegawai saat peran diubah
+      const onPeranChange = () => {
+        form.PEGAWAI_ID = form.PERAN === 'Ketua' ? '' : [];
+      };
+
+
+      const fetchData = () => {
+        loading.value = true;
+        if (typeof google !== 'undefined' && google.script) {
+          // Ambil data utama dan data referensi master secara paralel
+          google.script.run
+            .withSuccessHandler((data) => {
+              timAnggotaList.value = data || [];
+              loading.value = false;
+            })
+            .withFailureHandler((err) => {
+              showToast('Gagal memuat data anggota tim: ' + err.message, 'error');
+              loading.value = false;
+            })
+            .getTimAnggotaList();
+
+          google.script.run
+            .withSuccessHandler((res) => {
+              if (res) {
+                masterData.tahunList = res.tahunList || [];
+                masterData.timList = res.timList || [];
+                masterData.pegawaiList = res.pegawaiList || [];
+              }
+            })
+            .getMasterReferences();
+        } else {
+          setTimeout(() => { loading.value = false; }, 300);
+        }
+      };
+
+      const filteredList = computed(() => {
+        return timAnggotaList.value.filter(item => {
+          const q = searchQuery.value.toLowerCase();
+          return !q || 
+                 (item.PERAN && item.PERAN.toLowerCase().includes(q)) || 
+                 (item.KETERANGAN && item.KETERANGAN.toLowerCase().includes(q)) ||
+                 (item.TAHUN_LABEL && String(item.TAHUN_LABEL).toLowerCase().includes(q)) ||
+                 (item.TIM_LABEL && String(item.TIM_LABEL).toLowerCase().includes(q)) ||
+                 (item.PEGAWAI_LABEL && String(item.PEGAWAI_LABEL).toLowerCase().includes(q));
+        });
+      });
+
+      const totalPages = computed(() => Math.ceil(filteredList.value.length / perPage.value));
+      const startIndex = computed(() => (currentPage.value - 1) * perPage.value);
+      const paginatedList = computed(() => filteredList.value.slice(startIndex.value, startIndex.value + perPage.value));
+
+      const paginationInfo = computed(() => {
+        const total = filteredList.value.length;
+        if (total === 0) return 'Menampilkan 0 data';
+        const start = startIndex.value + 1;
+        const end = Math.min(startIndex.value + perPage.value, total);
+        return `Menampilkan ${start} - ${end} dari ${total} data`;
+      });
+
+      const displayedPages = computed(() => {
+        const total = totalPages.value;
+        const current = currentPage.value;
+        if (total <= 5) return Array.from({ length: total }, (_, i) => i + 1);
+        if (current <= 3) return [1, 2, 3, 4, '...', total];
+        if (current >= total - 2) return [1, '...', total - 3, total - 2, total - 1, total];
+        return [1, '...', current - 1, current, current + 1, '...', total];
+      });
+
+      const changePage = (page) => {
+        if (page >= 1 && page <= totalPages.value) currentPage.value = page;
+      };
+
+      const openModal = (mode, item = null) => {
+        if (mode === 'edit' && item) {
+          isEditMode.value = true;
+          Object.assign(form, item);
+        } else {
+          isEditMode.value = false;
+          Object.assign(form, {
+            ID_DETAIL_TIM: '',
+            TAHUN_ID: '',
+            TIM_ID: '',
+            PEGAWAI_ID: '',
+            PERAN: 'Anggota',
+            KETERANGAN: ''
+          });
+        }
+        showModal.value = true;
+      };
+
+      const closeModal = () => { showModal.value = false; };
+
+      const submitForm = () => {
+        saving.value = true;
+        if (typeof google !== 'undefined' && google.script) {
+          google.script.run
+            .withSuccessHandler((res) => {
+              saving.value = false;
+              if (res.success) {
+                closeModal();
+                fetchData();
+                showToast(res.message, 'success');
+              } else {
+                showToast(res.message, 'error');
+              }
+            })
+            .withFailureHandler((err) => {
+              saving.value = false;
+              showToast('Gagal menyimpan: ' + err.message, 'error');
+            })
+            .saveTimAnggota(form);
+        }
+      };
+
+      const openDeleteModal = (item) => {
+        selectedItem.value = item;
+        showDeleteModal.value = true;
+      };
+
+      const closeDeleteModal = () => {
+        showDeleteModal.value = false;
+        selectedItem.value = null;
+      };
+
+      const executeDelete = () => {
+        if (!selectedItem.value) return;
+        deleting.value = true;
+
+        if (typeof google !== 'undefined' && google.script) {
+          google.script.run
+            .withSuccessHandler((res) => {
+              deleting.value = false;
+              closeDeleteModal();
+              if (res.success) {
+                fetchData();
+                showToast(res.message, 'success');
+              } else {
+                showToast(res.message, 'error');
+              }
+            })
+            .withFailureHandler((err) => {
+              deleting.value = false;
+              closeDeleteModal();
+              showToast('Gagal menghapus: ' + err.message, 'error');
+            })
+            .deleteTimAnggota(selectedItem.value.ID_DETAIL_TIM);
+        }
+      };
+
+      // State untuk menampung ID baris yang dicentang
+      const selectedIds = ref([]);
+      const showBatchDeleteModal = ref(false);
+
+      // Cek apakah semua data di halaman aktif sedang dicentang
+      const isAllSelected = computed(() => {
+        if (paginatedList.value.length === 0) return false;
+        return paginatedList.value.every(item => selectedIds.value.includes(item.ID_DETAIL_TIM));
+      });
+
+      // Handler pilih semua / batalkan pilih semua di halaman aktif
+      const toggleSelectAll = (e) => {
+        if (e.target.checked) {
+          paginatedList.value.forEach(item => {
+            if (!selectedIds.value.includes(item.ID_DETAIL_TIM)) {
+              selectedIds.value.push(item.ID_DETAIL_TIM);
+            }
+          });
+        } else {
+          const pageIds = paginatedList.value.map(item => item.ID_DETAIL_TIM);
+          selectedIds.value = selectedIds.value.filter(id => !pageIds.includes(id));
+        }
+      };
+
+      const openBatchDeleteModal = () => {
+        showBatchDeleteModal.value = true;
+      };
+
+      const closeBatchDeleteModal = () => {
+        showBatchDeleteModal.value = false;
+      };
+
+      const executeBatchDelete = () => {
+        if (selectedIds.value.length === 0) return;
+        deleting.value = true;
+
+        if (typeof google !== 'undefined' && google.script) {
+          google.script.run
+            .withSuccessHandler((res) => {
+              deleting.value = false;
+              closeBatchDeleteModal();
+              if (res.success) {
+                selectedIds.value = []; // Reset pilihan
+                fetchData();
+                showToast(res.message, 'success');
+              } else {
+                showToast(res.message, 'error');
+              }
+            })
+            .withFailureHandler((err) => {
+              deleting.value = false;
+              closeBatchDeleteModal();
+              showToast('Gagal menghapus massal: ' + err.message, 'error');
+            })
+            .batchDeleteTimAnggota(selectedIds.value);
+        }
+      };
+
+      onMounted(() => { fetchData(); });
+
+      return {
+        timAnggotaList, masterData, loading, saving, deleting, showModal, showDeleteModal, isEditMode, form,
+        searchQuery, perPage, currentPage, totalPages, startIndex, paginatedList, paginationInfo,
+        displayedPages, toast, filteredTimList, onTahunChange, onPeranChange, changePage, openModal, closeModal, submitForm,
+        openDeleteModal, closeDeleteModal, executeDelete, fetchData, selectedItem,
+        pgwSearchQuery, getPegawaiName, toggleSelectPegawai, removeSelectedPegawai, filteredDropdownPegawai, sortedPegawaiList, selectedIds, showBatchDeleteModal, isAllSelected, toggleSelectAll, openBatchDeleteModal, closeBatchDeleteModal, executeBatchDelete
+      };
+    }
+  };
+</script>
