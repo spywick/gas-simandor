@@ -2,6 +2,7 @@
  * ============================================================================
  * SatuanService.gs - Pengelolaan Data Master Satuan di Sheet MASTER_SATUAN
  * ============================================================================
+ * Helper bersama (lock, pencarian baris, cek duplikat) ada di SheetRepo.gs.
  */
 
 /**
@@ -9,14 +10,7 @@
  * Jika sheet belum ada, otomatis dibuatkan beserta header kolomnya.
  */
 function getSatuanSheet() {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var sheet = ss.getSheetByName('MASTER_SATUAN');
-  
-  if (!sheet) {
-    sheet = ss.insertSheet('MASTER_SATUAN');
-    sheet.appendRow(['ID_SATUAN', 'NAMA_SATUAN', 'KETERANGAN', 'CREATED_AT']);
-  }
-  return sheet;
+  return getOrCreateSheet_('MASTER_SATUAN', ['ID_SATUAN', 'NAMA_SATUAN', 'KETERANGAN', 'CREATED_AT']);
 }
 
 /**
@@ -24,28 +18,7 @@ function getSatuanSheet() {
  */
 function getSatuanList() {
   try {
-    var sheet = getSatuanSheet();
-    var data = sheet.getDataRange().getValues();
-    
-    if (data.length <= 1) return [];
-
-    var headers = data[0];
-    var result = [];
-
-    for (var i = 1; i < data.length; i++) {
-      var row = data[i];
-      var obj = {};
-      
-      headers.forEach(function(header, index) {
-        if (header === 'CREATED_AT' && row[index] instanceof Date) {
-          obj[header] = Utilities.formatDate(row[index], Session.getScriptTimeZone(), "yyyy-MM-dd HH:mm:ss");
-        } else {
-          obj[header] = row[index];
-        }
-      });
-      result.push(obj);
-    }
-    return result;
+    return readObjects_(getSatuanSheet());
   } catch (error) {
     throw new Error("Gagal mengambil data satuan: " + error.message);
   }
@@ -56,61 +29,36 @@ function getSatuanList() {
  */
 function saveSatuan(formData) {
   try {
-    var sheet = getSatuanSheet();
-    var namaInput = String(formData.NAMA_SATUAN).trim();
-    var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
-    
-    var namaColIndex = headers.indexOf('NAMA_SATUAN') + 1;
-    var idColIndex = headers.indexOf('ID_SATUAN') + 1;
+    return withLock_(function () {
+      var sheet = getSatuanSheet();
+      var headers = getHeaders_(sheet);
 
-    // Validasi duplikasi nama satuan menggunakan TextFinder
-    if (namaColIndex > 0) {
-      var columnRange = sheet.getRange(2, namaColIndex, Math.max(sheet.getLastRow() - 1, 1), 1);
-      var finder = columnRange.createTextFinder(namaInput);
-      finder.matchEntireCell(true);
-      
-      var match = finder.findNext();
-      if (match) {
-        var matchedRow = match.getRow();
-        var existingId = sheet.getRange(matchedRow, idColIndex).getValue();
+      // Validasi duplikasi nama satuan (tidak peka huruf besar/kecil)
+      if (existsRow_(sheet, { NAMA_SATUAN: formData.NAMA_SATUAN }, {
+        caseInsensitive: true,
+        excludeIdHeader: 'ID_SATUAN',
+        excludeId: formData.ID_SATUAN
+      })) {
+        return { success: false, message: 'Gagal: Nama satuan "' + formData.NAMA_SATUAN + '" sudah terdaftar dalam sistem!' };
+      }
 
-        if (!formData.ID_SATUAN || existingId != formData.ID_SATUAN) {
-          return { success: false, message: 'Gagal: Nama satuan "' + formData.NAMA_SATUAN + '" sudah terdaftar dalam sistem!' };
+      if (formData.ID_SATUAN) {
+        // MODE UPDATE
+        var rowIndex = findRowById_(sheet, 'ID_SATUAN', formData.ID_SATUAN);
+        if (!rowIndex) {
+          return { success: false, message: 'Data satuan tidak ditemukan untuk diperbarui.' };
         }
-      }
-    }
-
-    // Proses Update atau Create
-    if (formData.ID_SATUAN) {
-      // MODE UPDATE
-      var idFinder = sheet.createTextFinder(formData.ID_SATUAN);
-      var idMatch = idFinder.findNext();
-      
-      if (idMatch) {
-        var rowIndex = idMatch.getRow();
-        headers.forEach(function(header, colIdx) {
-          if (header !== 'ID_SATUAN' && header !== 'CREATED_AT') {
-            sheet.getRange(rowIndex, colIdx + 1).setValue(formData[header] || '');
-          }
-        });
+        updateRow_(sheet, headers, rowIndex, formData, ['ID_SATUAN', 'CREATED_AT']);
         return { success: true, message: 'Data satuan berhasil diperbarui!' };
-      } else {
-        return { success: false, message: 'Data satuan tidak ditemukan untuk diperbarui.' };
       }
-    } else {
+
       // MODE CREATE
-      var newId = 'STN-' + Utilities.getUuid().substring(0, 8).toUpperCase();
-      var now = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "yyyy-MM-dd HH:mm:ss");
-
-      var newRow = headers.map(function(header) {
-        if (header === 'ID_SATUAN') return newId;
-        if (header === 'CREATED_AT') return now;
-        return formData[header] || '';
-      });
-
-      sheet.appendRow(newRow);
+      var row = copyObject_(formData);
+      row.ID_SATUAN = newId_('STN');
+      row.CREATED_AT = nowString_();
+      appendObject_(sheet, headers, row);
       return { success: true, message: 'Satuan baru berhasil ditambahkan!' };
-    }
+    });
   } catch (error) {
     return { success: false, message: "Terjadi kesalahan: " + error.message };
   }
@@ -118,18 +66,21 @@ function saveSatuan(formData) {
 
 /**
  * 3. DELETE: Menghapus data satuan berdasarkan ID_SATUAN.
+ * (Belum ada tabel yang mereferensikan satuan. Tambahkan pengecekan referensi
+ *  di sini begitu tabel honor/kegiatan memakai ID_SATUAN.)
  */
 function deleteSatuan(idSatuan) {
   try {
-    var sheet = getSatuanSheet();
-    var finder = sheet.createTextFinder(idSatuan);
-    var match = finder.findNext();
+    return withLock_(function () {
+      var sheet = getSatuanSheet();
+      var rowIndex = findRowById_(sheet, 'ID_SATUAN', idSatuan);
 
-    if (match) {
-      sheet.deleteRow(match.getRow());
-      return { success: true, message: 'Data satuan berhasil dihapus!' };
-    }
-    return { success: false, message: 'Data satuan tidak ditemukan.' };
+      if (rowIndex) {
+        sheet.deleteRow(rowIndex);
+        return { success: true, message: 'Data satuan berhasil dihapus!' };
+      }
+      return { success: false, message: 'Data satuan tidak ditemukan.' };
+    });
   } catch (error) {
     return { success: false, message: "Gagal menghapus: " + error.message };
   }

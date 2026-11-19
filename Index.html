@@ -9,10 +9,10 @@
   <link rel="icon" type="image/png" href="https://lh3.googleusercontent.com/d/1C4qrN0Gqck_xUcdFaLR0-J8RRiDnLAPA" />
 
   <!-- Tailwind CSS CDN -->
-  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.tailwindcss.com/3.4.17"></script>
   
   <!-- Vue.js 3 CDN -->
-  <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+  <script src="https://unpkg.com/vue@3.5.13/dist/vue.global.js"></script>
 </head>
 <body class="bg-[#f1f5f9] font-sans">
 
@@ -95,7 +95,7 @@
 
         const updateClock = () => {
           const now = new Date();
-          const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' };
+          const options = { timeZone: 'Asia/Jakarta', weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' };
           currentTime.value = now.toLocaleDateString('id-ID', options) + ' WIB';
         };
 

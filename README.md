@@ -37,17 +37,25 @@ Aplikasi ini menggunakan pola struktur modular di Google Apps Script editor:
 ```
 SIMANDOR/
 ├── Code.gs                   # Router utama Web App (doGet) & helper include template
-├── UserService.gs            # Logic backend & database CRUD (Sheet: MASTER_USER)
-├── TahunService.gs           # Logic backend (Sheet: MASTER_TAHUN) - Upcoming
-├── TimService.gs             # Logic backend (Sheet: MASTER_TIM) - Upcoming
-├── KegiatanService.gs        # Logic backend (Sheet: MASTER_KEGIATAN) - Upcoming
+├── SheetRepo.gs              # Helper bersama: lock, cari baris by ID, cek duplikat & referensi
+├── UserService.gs            # CRUD Sheet MASTER_USER
+├── TahunService.gs           # CRUD Sheet MASTER_TAHUN
+├── TimService.gs             # CRUD Sheet MASTER_TIM
+├── SatuanService.gs          # CRUD Sheet MASTER_SATUAN
+├── PegawaiService.gs         # CRUD Sheet MASTER_PEGAWAI
+├── TimAnggotaService.gs      # CRUD Sheet MASTER_TIM_ANGGOTA (termasuk batch tambah/hapus, cegah anggota ganda)
+├── KegiatanService.gs        # Sheet MASTER_KEGIATAN - Upcoming (masih kosong)
 ├── Index.html                # Kerangka layout utama, CDN loader, header, footer & Vue mounting
 ├── Sidebar.html              # Komponen menu navigasi samping responsif
-├── Page_Beranda.html         # Komponen halaman Beranda / Welcome Screen
-├── Page_User.html            # Komponen halaman Master User (Tabel, Modal, Pagination)
-├── Page_Tahun.html           # Komponen halaman Master Tahun
-├── Page_Tim.html             # Komponen halaman Master Tim
-└── Page_Kegiatan.html        # Komponen halaman Master Kegiatan
+├── Page_Beranda.html         # Halaman Beranda / Welcome Screen
+├── Page_Admin.html           # Panel Admin (tab User, Tahun, Tim, Satuan)
+├── Page_User.html            # Halaman Master User
+├── Page_Tahun.html           # Halaman Master Tahun
+├── Page_Tim.html             # Halaman Master Tim
+├── Page_Satuan.html          # Halaman Master Satuan
+├── Page_Pegawai.html         # Halaman Master Pegawai
+├── Page_Tim_Anggota.html     # Halaman Anggota Tim
+└── Page_Kegiatan.html        # Halaman Kegiatan - Upcoming (placeholder)
 ```
 
 ## 🗄️ Skema Database (Google Sheets)
@@ -83,6 +91,7 @@ Aplikasi ini memanfaatkan sheet dalam satu spreadsheet Google Sheets sebagai tab
 | `TAHUN_ID` | String (UUID) | Foreign Key -> `MASTER_TAHUN` | 
 | `NAMA_TIM` | String | Nama Tim Kerja | 
 | `KETERANGAN` | String | Catatan tambahan | 
+| `CREATED_AT` | Timestamp | Waktu pembuatan | 
 
 ### 4. `MASTER_KEGIATAN`
 
@@ -94,12 +103,46 @@ Aplikasi ini memanfaatkan sheet dalam satu spreadsheet Google Sheets sebagai tab
 | `NAMA_KEGIATAN` | String | Nama Kegiatan | 
 | `SINGKATAN_KEGIATAN` | String | Kode / Singkatan | 
 
+### 5. `MASTER_SATUAN`
+
+| Kolom | Tipe Data | Keterangan | 
+| ----- | ----- | ----- | 
+| `ID_SATUAN` | String | Primary Key (prefix `STN-`) | 
+| `NAMA_SATUAN` | String | Nama satuan (unik) | 
+| `KETERANGAN` | String | Catatan tambahan | 
+| `CREATED_AT` | Timestamp | Waktu pembuatan | 
+
+### 6. `MASTER_PEGAWAI`
+
+| Kolom | Tipe Data | Keterangan | 
+| ----- | ----- | ----- | 
+| `ID_PEGAWAI` | String | Primary Key (prefix `PGW-`) | 
+| `NAMA_PEGAWAI`, `NIP_LAMA`, `NIP_BARU`, `GOL_RUANG` | String | Identitas kepegawaian | 
+| `JENIS_KELAMIN`, `TANGGAL_LAHIR`, `ALAMAT`, `JABATAN`, `NO_HP` | String / Date | Data pribadi & jabatan | 
+| `EMAIL_GMAIL`, `EMAIL_SATKER` | String | Email pegawai | 
+| `STATUS`, `KATEGORI` | String | Status keaktifan (`Aktif`) & kategori | 
+| `CREATED_AT`, `CREATED_BY`, `UPDATED_AT`, `UPDATED_BY` | Timestamp / String | Audit | 
+
+### 7. `MASTER_TIM_ANGGOTA`
+
+| Kolom | Tipe Data | Keterangan | 
+| ----- | ----- | ----- | 
+| `ID_DETAIL_TIM` | String | Primary Key (prefix `TIMANGGOTA-`) | 
+| `TAHUN_ID` | String | Foreign Key -> `MASTER_TAHUN` | 
+| `TIM_ID` | String | Foreign Key -> `MASTER_TIM` | 
+| `PEGAWAI_ID` | String | Foreign Key -> `MASTER_PEGAWAI` | 
+| `PERAN` | String | Peran pegawai dalam tim | 
+| `KETERANGAN` | String | Catatan tambahan | 
+| `CREATED_AT` | Timestamp | Waktu pembuatan | 
+
+> Sheet `MASTER_USER`, `MASTER_TAHUN`, `MASTER_TIM`, `MASTER_SATUAN`, `MASTER_PEGAWAI`, dan `MASTER_TIM_ANGGOTA` dibuat otomatis beserta headernya saat pertama kali diakses.
+
 ## ⚙️ Cara Instalasi & Deployment
 
 ### 1. Persiapan Database
 
 1. Buat satu file **Google Sheets** baru di Google Drive Anda.
-2. Buat tab/sheet sesuai dengan skema di atas (`MASTER_USER`, `MASTER_TAHUN`, `MASTER_TIM`, `MASTER_KEGIATAN`).
+2. Buat tab/sheet sesuai dengan skema di atas, atau biarkan dibuat otomatis oleh aplikasi (kecuali `MASTER_KEGIATAN`, yang belum memiliki service).
 
 ### 2. Setup Google Apps Script
 

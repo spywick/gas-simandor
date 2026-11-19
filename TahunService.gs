@@ -2,21 +2,22 @@
  * ============================================================================
  * TahunService.gs - Pengelolaan Data Master Tahun di Sheet MASTER_TAHUN
  * ============================================================================
+ * Helper bersama (lock, pencarian baris, cek duplikat/referensi) ada di SheetRepo.gs.
  */
 
+/** Tabel lain yang memakai ID_TAHUN sebagai foreign key. */
+var TAHUN_REFERENCES_ = [
+  { sheet: 'MASTER_TIM',          header: 'TAHUN_ID', label: 'Tim' },
+  { sheet: 'MASTER_TIM_ANGGOTA',  header: 'TAHUN_ID', label: 'Anggota Tim' },
+  { sheet: 'MASTER_KEGIATAN',     header: 'TAHUN_ID', label: 'Kegiatan' }
+];
+
 /**
- * Fungsi helper untuk mendapatkan objek Sheet 'MASTER_USER'.
+ * Fungsi helper untuk mendapatkan objek Sheet 'MASTER_TAHUN'.
  * Jika sheet belum ada, otomatis dibuatkan beserta 4 kolom utamanya.
  */
 function getTahunSheet() {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var sheet = ss.getSheetByName('MASTER_TAHUN');
-  
-  if (!sheet) {
-    sheet = ss.insertSheet('MASTER_TAHUN');
-    sheet.appendRow(['ID_TAHUN', 'TAHUN', 'KETERANGAN', 'CREATED_AT']);
-  }
-  return sheet;
+  return getOrCreateSheet_('MASTER_TAHUN', ['ID_TAHUN', 'TAHUN', 'KETERANGAN', 'CREATED_AT']);
 }
 
 /**
@@ -24,28 +25,7 @@ function getTahunSheet() {
  */
 function getTahunList() {
   try {
-    var sheet = getTahunSheet();
-    var data = sheet.getDataRange().getValues();
-    
-    if (data.length <= 1) return [];
-
-    var headers = data[0];
-    var result = [];
-
-    for (var i = 1; i < data.length; i++) {
-      var row = data[i];
-      var obj = {};
-      
-      headers.forEach(function(header, index) {
-        if (header === 'CREATED_AT' && row[index] instanceof Date) {
-          obj[header] = Utilities.formatDate(row[index], Session.getScriptTimeZone(), "yyyy-MM-dd HH:mm:ss");
-        } else {
-          obj[header] = row[index];
-        }
-      });
-      result.push(obj);
-    }
-    return result;
+    return readObjects_(getTahunSheet());
   } catch (error) {
     throw new Error("Gagal mengambil data tahun: " + error.message);
   }
@@ -56,61 +36,35 @@ function getTahunList() {
  */
 function saveTahun(formData) {
   try {
-    var sheet = getTahunSheet();
-    var tahunInput = String(formData.TAHUN).trim();
-    var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
-    
-    var tahunColIndex = headers.indexOf('TAHUN') + 1;
-    var idColIndex = headers.indexOf('ID_TAHUN') + 1;
+    return withLock_(function () {
+      var sheet = getTahunSheet();
+      var headers = getHeaders_(sheet);
 
-    // Validasi duplikasi tahun menggunakan TextFinder
-    if (tahunColIndex > 0) {
-      var tahunColumnRange = sheet.getRange(2, tahunColIndex, Math.max(sheet.getLastRow() - 1, 1), 1);
-      var finder = tahunColumnRange.createTextFinder(tahunInput);
-      finder.matchEntireCell(true);
-      
-      var match = finder.findNext();
-      if (match) {
-        var matchedRow = match.getRow();
-        var existingId = sheet.getRange(matchedRow, idColIndex).getValue();
+      // Validasi duplikasi tahun
+      if (existsRow_(sheet, { TAHUN: formData.TAHUN }, {
+        excludeIdHeader: 'ID_TAHUN',
+        excludeId: formData.ID_TAHUN
+      })) {
+        return { success: false, message: 'Gagal: Tahun "' + formData.TAHUN + '" sudah terdaftar dalam sistem!' };
+      }
 
-        if (!formData.ID_TAHUN || existingId != formData.ID_TAHUN) {
-          return { success: false, message: 'Gagal: Tahun "' + formData.TAHUN + '" sudah terdaftar dalam sistem!' };
+      if (formData.ID_TAHUN) {
+        // MODE UPDATE
+        var rowIndex = findRowById_(sheet, 'ID_TAHUN', formData.ID_TAHUN);
+        if (!rowIndex) {
+          return { success: false, message: 'Data tahun tidak ditemukan untuk diperbarui.' };
         }
-      }
-    }
-
-    // Proses Update atau Create
-    if (formData.ID_TAHUN) {
-      // MODE UPDATE
-      var idFinder = sheet.createTextFinder(formData.ID_TAHUN);
-      var idMatch = idFinder.findNext();
-      
-      if (idMatch) {
-        var rowIndex = idMatch.getRow();
-        headers.forEach(function(header, colIdx) {
-          if (header !== 'ID_TAHUN' && header !== 'CREATED_AT') {
-            sheet.getRange(rowIndex, colIdx + 1).setValue(formData[header] || '');
-          }
-        });
+        updateRow_(sheet, headers, rowIndex, formData, ['ID_TAHUN', 'CREATED_AT']);
         return { success: true, message: 'Data tahun berhasil diperbarui!' };
-      } else {
-        return { success: false, message: 'Data tahun tidak ditemukan untuk diperbarui.' };
       }
-    } else {
+
       // MODE CREATE
-      var newId = 'THN-' + Utilities.getUuid().substring(0, 8).toUpperCase();
-      var now = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "yyyy-MM-dd HH:mm:ss");
-
-      var newRow = headers.map(function(header) {
-        if (header === 'ID_TAHUN') return newId;
-        if (header === 'CREATED_AT') return now;
-        return formData[header] || '';
-      });
-
-      sheet.appendRow(newRow);
+      var row = copyObject_(formData);
+      row.ID_TAHUN = newId_('THN');
+      row.CREATED_AT = nowString_();
+      appendObject_(sheet, headers, row);
       return { success: true, message: 'Tahun baru berhasil ditambahkan!' };
-    }
+    });
   } catch (error) {
     return { success: false, message: "Terjadi kesalahan: " + error.message };
   }
@@ -118,18 +72,26 @@ function saveTahun(formData) {
 
 /**
  * 3. DELETE: Menghapus data tahun berdasarkan ID_TAHUN.
+ * Ditolak jika tahun masih dipakai Tim, Anggota Tim, atau Kegiatan.
  */
 function deleteTahun(idTahun) {
   try {
-    var sheet = getTahunSheet();
-    var finder = sheet.createTextFinder(idTahun);
-    var match = finder.findNext();
+    return withLock_(function () {
+      var sheet = getTahunSheet();
+      var rowIndex = findRowById_(sheet, 'ID_TAHUN', idTahun);
 
-    if (match) {
-      sheet.deleteRow(match.getRow());
+      if (!rowIndex) {
+        return { success: false, message: 'Data tahun tidak ditemukan.' };
+      }
+
+      var used = findReferences_(idTahun, TAHUN_REFERENCES_);
+      if (used.length) {
+        return { success: false, message: referenceMessage_('Tahun ini', used) };
+      }
+
+      sheet.deleteRow(rowIndex);
       return { success: true, message: 'Data tahun berhasil dihapus!' };
-    }
-    return { success: false, message: 'Data tahun tidak ditemukan.' };
+    });
   } catch (error) {
     return { success: false, message: "Gagal menghapus: " + error.message };
   }
