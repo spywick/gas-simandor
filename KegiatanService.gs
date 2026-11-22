@@ -2,21 +2,26 @@
  * ============================================================================
  * KegiatanService.gs - Pengelolaan Data Master Kegiatan di Sheet MASTER_KEGIATAN
  * ============================================================================
+ * Helper bersama (lock, pencarian baris, cek referensi) ada di SheetRepo.gs.
  */
+
+/**
+ * Tabel lain yang memakai ID_KEGIATAN sebagai foreign key.
+ * Daftarkan tabel baru di sini (mis. honor) agar kegiatan yang sudah dipakai
+ * tidak bisa dihapus. Contoh:
+ *   { sheet: 'HONOR_KEGIATAN', header: 'KEGIATAN_ID', label: 'Honor' }
+ */
+var KEGIATAN_REFERENCES_ = [];
 
 /**
  * Fungsi helper untuk mendapatkan objek Sheet 'MASTER_KEGIATAN'.
  * Jika sheet belum ada, otomatis dibuatkan beserta header kolomnya.
  */
 function getKegiatanSheet() {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var sheet = ss.getSheetByName('MASTER_KEGIATAN');
-  
-  if (!sheet) {
-    sheet = ss.insertSheet('MASTER_KEGIATAN');
-    sheet.appendRow(['ID_KEGIATAN', 'TAHUN_ID', 'TIM_ID', 'NAMA_KEGIATAN', 'SINGKATAN_KEGIATAN', 'CREATED_AT', 'CREATED_BY', 'UPDATED_AT', 'UPDATED_BY']);
-  }
-  return sheet;
+  return getOrCreateSheet_('MASTER_KEGIATAN', [
+    'ID_KEGIATAN', 'TAHUN_ID', 'TIM_ID', 'NAMA_KEGIATAN', 'SINGKATAN_KEGIATAN',
+    'CREATED_AT', 'CREATED_BY', 'UPDATED_AT', 'UPDATED_BY'
+  ]);
 }
 
 /**
@@ -24,60 +29,18 @@ function getKegiatanSheet() {
  */
 function getKegiatanList() {
   try {
-    var ss = SpreadsheetApp.getActiveSpreadsheet();
-    var sheet = getKegiatanSheet();
-    var data = sheet.getDataRange().getValues();
-    
-    if (data.length <= 1) return [];
+    var list = readObjects_(getKegiatanSheet());
+    if (!list.length) return [];
 
-    var headers = data[0];
+    var tahunMap = lookupMap_('MASTER_TAHUN', 'ID_TAHUN', 'TAHUN');   // ID_TAHUN -> TAHUN
+    var timMap = lookupMap_('MASTER_TIM', 'ID_TIM', 'NAMA_TIM');      // ID_TIM -> NAMA_TIM
 
-    // Mapping Relasi Tahun (ID_TAHUN -> TAHUN)
-    var tahunMap = {};
-    var tahunSheet = ss.getSheetByName('MASTER_TAHUN');
-    if (tahunSheet && tahunSheet.getLastRow() > 1) {
-      var tData = tahunSheet.getDataRange().getValues();
-      var tHeaders = tData[0];
-      var idThnIdx = tHeaders.indexOf('ID_TAHUN');
-      var thnIdx = tHeaders.indexOf('TAHUN');
-      for (var t = 1; t < tData.length; t++) {
-        tahunMap[tData[t][idThnIdx]] = tData[t][thnIdx];
-      }
-    }
-
-    // Mapping Relasi Tim (ID_TIM -> NAMA_TIM)
-    var timMap = {};
-    var timSheet = ss.getSheetByName('MASTER_TIM');
-    if (timSheet && timSheet.getLastRow() > 1) {
-      var tmData = timSheet.getDataRange().getValues();
-      var tmHeaders = tmData[0];
-      var idTimIdx = tmHeaders.indexOf('ID_TIM');
-      var namaTimIdx = tmHeaders.indexOf('NAMA_TIM');
-      for (var tm = 1; tm < tmData.length; tm++) {
-        timMap[tmData[tm][idTimIdx]] = tmData[tm][namaTimIdx];
-      }
-    }
-
-    var result = [];
-    for (var i = 1; i < data.length; i++) {
-      var row = data[i];
-      var obj = {};
-      
-      headers.forEach(function(header, index) {
-        if ((header === 'CREATED_AT' || header === 'UPDATED_AT') && row[index] instanceof Date) {
-          obj[header] = Utilities.formatDate(row[index], Session.getScriptTimeZone(), "yyyy-MM-dd HH:mm:ss");
-        } else {
-          obj[header] = row[index];
-        }
-      });
-
+    list.forEach(function (obj) {
       // Menambahkan label Tahun dan Tim untuk kemudahan tampilan di Vue.js
       obj['TAHUN_LABEL'] = tahunMap[obj['TAHUN_ID']] || obj['TAHUN_ID'];
       obj['TIM_LABEL'] = timMap[obj['TIM_ID']] || obj['TIM_ID'];
-
-      result.push(obj);
-    }
-    return result;
+    });
+    return list;
   } catch (error) {
     throw new Error("Gagal mengambil data kegiatan: " + error.message);
   }
@@ -85,44 +48,51 @@ function getKegiatanList() {
 
 /**
  * 2. CREATE / UPDATE: Menyimpan atau memperbarui data kegiatan.
+ * Validasi: nama kegiatan wajib, Tahun harus ada, dan Tim harus ada
+ * serta merupakan tim milik tahun yang dipilih.
  */
 function saveKegiatan(formData) {
   try {
-    var sheet = getKegiatanSheet();
-    var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
-    var now = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "yyyy-MM-dd HH:mm:ss");
+    return withLock_(function () {
+      var sheet = getKegiatanSheet();
+      var headers = getHeaders_(sheet);
+      var now = nowString_();
+      var currentUser = Session.getActiveUser().getEmail() || "Admin";
 
-    if (formData.ID_KEGIATAN) {
-      // MODE UPDATE: Mengisi kolom UPDATED_AT dan memperbarui data
-      var idFinder = sheet.createTextFinder(formData.ID_KEGIATAN);
-      var idMatch = idFinder.findNext();
-      
-      if (idMatch) {
-        var rowIndex = idMatch.getRow();
-        headers.forEach(function(header, colIdx) {
-          if (header === 'UPDATED_AT') {
-            sheet.getRange(rowIndex, colIdx + 1).setValue(now);
-          } else if (header !== 'ID_KEGIATAN' && header !== 'CREATED_AT' && header !== 'CREATED_BY') {
-            sheet.getRange(rowIndex, colIdx + 1).setValue(formData[header] || '');
-          }
-        });
-        return { success: true, message: 'Data kegiatan berhasil diperbarui!' };
-      } else {
-        return { success: false, message: 'Data kegiatan tidak ditemukan.' };
+      // --- VALIDASI ---
+      if (!String(formData.NAMA_KEGIATAN || '').trim()) {
+        return { success: false, message: 'Gagal: Nama kegiatan wajib diisi!' };
       }
-    } else {
-      // MODE CREATE: Menambahkan kegiatan baru dengan ID unik (KGT-XXXXXXXX)
-      var newId = 'KGT-' + Utilities.getUuid().substring(0, 8).toUpperCase();
-      var newRow = headers.map(function(header) {
-        if (header === 'ID_KEGIATAN') return newId;
-        if (header === 'CREATED_AT') return now;
-        if (header === 'UPDATED_AT') return now;
-        return formData[header] || '';
-      });
+      if (!existsRow_(getTahunSheet(), { ID_TAHUN: formData.TAHUN_ID })) {
+        return { success: false, message: 'Gagal: Tahun yang dipilih tidak ditemukan!' };
+      }
+      // Satu pengecekan untuk dua hal: Tim ada, dan tim tersebut milik tahun yang dipilih
+      if (!existsRow_(getTimSheet(), { ID_TIM: formData.TIM_ID, TAHUN_ID: formData.TAHUN_ID })) {
+        return { success: false, message: 'Gagal: Tim tidak ditemukan atau bukan tim pada tahun yang dipilih!' };
+      }
 
-      sheet.appendRow(newRow);
+      if (formData.ID_KEGIATAN) {
+        // MODE UPDATE: Mengisi kolom UPDATED_AT/UPDATED_BY dan memperbarui data
+        var rowIndex = findRowById_(sheet, 'ID_KEGIATAN', formData.ID_KEGIATAN);
+        if (!rowIndex) {
+          return { success: false, message: 'Data kegiatan tidak ditemukan.' };
+        }
+        updateRow_(sheet, headers, rowIndex, formData,
+          ['ID_KEGIATAN', 'CREATED_AT', 'CREATED_BY'],
+          { UPDATED_AT: now, UPDATED_BY: currentUser });
+        return { success: true, message: 'Data kegiatan berhasil diperbarui!' };
+      }
+
+      // MODE CREATE: Menambahkan kegiatan baru dengan ID unik (KGT-XXXXXXXX)
+      var row = copyObject_(formData);
+      row.ID_KEGIATAN = newId_('KGT');
+      row.CREATED_AT = now;
+      row.CREATED_BY = currentUser;
+      row.UPDATED_AT = now;
+      row.UPDATED_BY = currentUser;
+      appendObject_(sheet, headers, row);
       return { success: true, message: 'Kegiatan baru berhasil ditambahkan!' };
-    }
+    });
   } catch (error) {
     return { success: false, message: "Terjadi kesalahan: " + error.message };
   }
@@ -130,18 +100,26 @@ function saveKegiatan(formData) {
 
 /**
  * 3. DELETE: Menghapus data kegiatan dari sheet berdasarkan ID_KEGIATAN.
+ * Ditolak jika kegiatan masih dipakai tabel lain (lihat KEGIATAN_REFERENCES_).
  */
 function deleteKegiatan(idKegiatan) {
   try {
-    var sheet = getKegiatanSheet();
-    var finder = sheet.createTextFinder(idKegiatan);
-    var match = finder.findNext();
+    return withLock_(function () {
+      var sheet = getKegiatanSheet();
+      var rowIndex = findRowById_(sheet, 'ID_KEGIATAN', idKegiatan);
 
-    if (match) {
-      sheet.deleteRow(match.getRow());
+      if (!rowIndex) {
+        return { success: false, message: 'Data kegiatan tidak ditemukan.' };
+      }
+
+      var used = findReferences_(idKegiatan, KEGIATAN_REFERENCES_);
+      if (used.length) {
+        return { success: false, message: referenceMessage_('Kegiatan ini', used) };
+      }
+
+      sheet.deleteRow(rowIndex);
       return { success: true, message: 'Data kegiatan berhasil dihapus!' };
-    }
-    return { success: false, message: 'Data kegiatan tidak ditemukan.' };
+    });
   } catch (error) {
     return { success: false, message: "Gagal menghapus: " + error.message };
   }

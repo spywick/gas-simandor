@@ -5,7 +5,7 @@
       <div class="space-y-6">
         
         <!-- Toast Notifikasi Melayang -->
-        <div v-if="toast.show" :class="toast.type === 'success' ? 'bg-green-600' : 'bg-red-600'" class="fixed top-5 right-5 z-50 text-white px-4 py-3 rounded-xl shadow-lg flex items-center space-x-2 text-xs transition-all duration-300">
+        <div v-if="toast.show" :class="toast.type === 'success' ? 'bg-green-600' : 'bg-red-600'" class="fixed top-5 right-5 z-[70] text-white px-4 py-3 rounded-xl shadow-lg flex items-center space-x-2 text-xs transition-all duration-300">
           <span>{{ toast.type === 'success' ? '✅' : '⚠️' }}</span>
           <span class="font-medium">{{ toast.message }}</span>
         </div>
@@ -17,14 +17,19 @@
           <div class="p-4 sm:p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
             <div>
               <h3 class="text-sm font-semibold text-gray-900">Kelola Anggota Tim</h3>
-              <p class="text-xs text-gray-600 mt-0.5">Kelola penugasan pegawai (Ketua / Anggota) ke dalam tim kerja berdasarkan tahun anggaran.</p>
+              <p class="text-xs text-gray-600 mt-0.5">Klik nama tim atau tombol Detail untuk melihat informasi tim, atau buka daftar anggota secara langsung.</p>
             </div>
             
-            <div class="flex items-center space-x-2">
-              <!-- Tombol Batch Delete (Hanya muncul jika ada baris yang dicentang) -->
+            <div class="flex items-center flex-wrap gap-2">
+              <!-- Tombol Batch Delete (Hanya muncul jika ada anggota yang dicentang) -->
               <button v-if="selectedIds.length > 0" @click="openBatchDeleteModal" class="bg-red-600 hover:bg-red-700 text-white px-3 py-2 rounded-lg text-xs font-semibold shadow transition flex items-center space-x-1">
                 <span>🗑️ Hapus Terpilih ({{ selectedIds.length }})</span>
               </button>
+
+              <button @click="toggleExpandAll" :disabled="groupedTimList.length === 0" class="bg-white hover:bg-gray-50 text-gray-700 border border-gray-300 px-3 py-2 rounded-lg text-xs font-semibold shadow-sm transition disabled:opacity-40">
+                {{ areAllExpanded ? 'Tutup Semua Anggota' : 'Buka Semua Anggota' }}
+              </button>
+
               <button @click="fetchData" :disabled="loading" class="bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-2 rounded-lg text-xs font-semibold shadow-sm transition flex items-center space-x-1 disabled:opacity-50" title="Muat ulang data">
                 <svg :class="{'animate-spin': loading}" class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
@@ -32,7 +37,7 @@
                 <span>Refresh</span>
               </button>
               
-              <button @click="openModal('create')" class="bg-blue-600 hover:bg-blue-700 text-white px-3.5 py-2 rounded-lg text-xs font-semibold shadow transition flex items-center space-x-1.5 flex-shrink-0">
+              <button @click="openModal" class="bg-blue-600 hover:bg-blue-700 text-white px-3.5 py-2 rounded-lg text-xs font-semibold shadow transition flex items-center space-x-1.5 flex-shrink-0">
                 <span>+ Tambah Anggota Tim</span>
               </button>
             </div>
@@ -40,7 +45,7 @@
 
           <hr class="border-gray-100">
 
-          <!-- Kontrol Atas Tabel (Filter & Pencarian) -->
+          <!-- Kontrol Atas Tabel (Filter Tahun & Pencarian) -->
           <div class="p-4 sm:p-5 bg-gray-50/50 border-b border-gray-100 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 text-xs">
             <div class="flex items-center space-x-2 text-gray-600">
               <span>Tampilkan</span>
@@ -50,13 +55,22 @@
                 <option :value="25">25</option>
                 <option :value="50">50</option>
               </select>
-              <span>data per halaman</span>
+              <span>tim per halaman</span>
             </div>
 
-            <!-- Search Input -->
-            <div class="w-full lg:w-64 relative">
-              <span class="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-gray-400">🔍</span>
-              <input v-model="searchQuery" @input="currentPage = 1" type="text" placeholder="Cari nama, tim, tahun, atau peran..." class="w-full pl-9 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none bg-white" />
+            <!-- Area Filter Tahun & Search Input -->
+            <div class="w-full lg:w-auto flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5">
+              <select v-model="filterTahun" @change="currentPage = 1" class="w-full sm:w-auto px-3 py-2 bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                <option value="">Semua Tahun</option>
+                <option v-for="thn in masterData.tahunList" :key="thn.ID_TAHUN" :value="thn.ID_TAHUN">
+                  {{ thn.TAHUN }}
+                </option>
+              </select>
+
+              <div class="w-full sm:w-72 relative">
+                <span class="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-gray-400">🔍</span>
+                <input v-model="searchQuery" @input="currentPage = 1" type="text" placeholder="Cari nama tim, pegawai, tahun, peran..." class="w-full pl-9 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none bg-white" />
+              </div>
             </div>
           </div>
 
@@ -64,72 +78,192 @@
             <span>{{ paginationInfo }}</span>
           </div>
 
-          <!-- Tabel Data Anggota Tim -->
+          <!-- Tabel Data Tim (Collapse Anggota) -->
           <div class="p-4 sm:p-6 pt-2">
             <div class="overflow-x-auto">
               <table class="min-w-full divide-y divide-gray-200 text-xs">
                 <thead class="bg-gray-50 text-gray-500 uppercase font-semibold">
                   <tr>
-                    <th class="px-4 py-3 text-center w-10">
-                      <input type="checkbox" @change="toggleSelectAll" :checked="isAllSelected" class="rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer" />
-                    </th>
-                    <th class="px-4 py-3 text-left">No</th>
-                    <th class="px-4 py-3 text-left">Tahun Anggaran</th>
+                    <th class="px-3 py-3 text-center w-10">Anggota</th>
+                    <th class="px-4 py-3 text-left w-14">No</th>
                     <th class="px-4 py-3 text-left">Nama Tim</th>
-                    <th class="px-4 py-3 text-left">Nama Pegawai</th>
-                    <th class="px-4 py-3 text-left">Peran</th>
-                    <th class="px-4 py-3 text-left">Keterangan</th>
+                    <th class="px-4 py-3 text-left">Tahun</th>
+                    <th class="px-4 py-3 text-center">Personel</th>
                     <th class="px-4 py-3 text-center">Aksi</th>
                   </tr>
                 </thead>
                 <tbody class="divide-y divide-gray-200 bg-white">
                   <!-- Loading State -->
                   <tr v-if="loading">
-                    <td colspan="7" class="px-4 py-8 text-center text-gray-400">
+                    <td colspan="6" class="px-4 py-8 text-center text-gray-400">
                       <div class="inline-block w-6 h-6 border-2 border-blue-600 border-t-transparent rounded-full animate-spin mr-2"></div>
-                      Memuat data anggota tim...
+                      Memuat data tim & anggota...
                     </td>
                   </tr>
 
                   <!-- State Kosong -->
                   <tr v-else-if="paginatedList.length === 0">
-                    <td colspan="7" class="px-4 py-12 text-center">
+                    <td colspan="6" class="px-4 py-12 text-center">
                       <div class="flex flex-col items-center justify-center space-y-2">
                         <div class="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center text-gray-400">
                           <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"/></svg>
                         </div>
                         <p class="font-medium text-gray-700">
-                          {{ timAnggotaList.length === 0 ? 'Belum ada data anggota tim.' : 'Tidak ada data yang sesuai dengan pencarian.' }}
+                          {{ groupedTimList.length === 0 && !searchQuery && !filterTahun ? 'Belum ada data anggota tim.' : 'Tidak ada tim atau anggota yang sesuai dengan filter atau pencarian.' }}
                         </p>
-                        <button v-if="timAnggotaList.length > 0 && searchQuery" @click="searchQuery = ''" class="mt-2 px-3 py-1 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-md font-medium transition">
-                          Reset Pencarian
+                        <button v-if="searchQuery || filterTahun" @click="resetFilter" class="mt-2 px-3 py-1 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-md font-medium transition">
+                          Reset Filter
                         </button>
                       </div>
                     </td>
                   </tr>
 
-                  <!-- Data Row -->
-                  <tr v-else v-for="(item, index) in paginatedList" :key="item.ID_DETAIL_TIM" class="hover:bg-gray-50 transition">
-                    <td class="px-4 py-3 text-center">
-                      <input type="checkbox" v-model="selectedIds" :value="item.ID_DETAIL_TIM" class="rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer" />
-                    </td>
-                    <td class="px-4 py-3 text-gray-500 font-medium">{{ startIndex + index + 1 }}</td>
-                    <td class="px-4 py-3 text-gray-900 font-semibold">{{ item.TAHUN_LABEL }}</td>
-                    <td class="px-4 py-3 text-gray-800 font-medium">{{ item.TIM_LABEL }}</td>
-                    <td class="px-4 py-3 text-gray-900 font-medium">{{ item.PEGAWAI_LABEL }}</td>
-                    <td class="px-4 py-3">
-                      <span :class="item.PERAN === 'Ketua' ? 'bg-purple-50 text-purple-700 border border-purple-200' : 'bg-blue-50 text-blue-700 border border-blue-200'" class="px-2.5 py-0.5 text-[10px] font-bold rounded-full">
-                        {{ item.PERAN || 'Anggota' }}
-                      </span>
-                    </td>
-                    <td class="px-4 py-3 text-gray-600">{{ item.KETERANGAN || '-' }}</td>
+                  <!-- Baris Tim Utama + Baris Collapse Anggota -->
+                  <template v-else v-for="(group, index) in paginatedList" :key="group.groupKey">
+                    <tr :class="isExpanded(group.groupKey) ? 'bg-blue-50/40' : 'hover:bg-gray-50'" class="transition">
+                      <!-- Tombol Collapse Anggota -->
+                      <td class="px-3 py-3 text-center">
+                        <button
+                          type="button"
+                          @click="toggleExpand(group.groupKey)"
+                          class="w-7 h-7 rounded-lg border border-gray-200 bg-white hover:bg-gray-100 text-gray-700 inline-flex items-center justify-center transition"
+                          :title="isExpanded(group.groupKey) ? 'Sembunyikan daftar anggota' : 'Lihat daftar anggota'"
+                        >
+                          <svg
+                            :class="{'rotate-90': isExpanded(group.groupKey)}"
+                            class="w-3.5 h-3.5 transition-transform duration-200"
+                            fill="none"
+                            stroke="currentColor"
+                            stroke-width="2"
+                            viewBox="0 0 24 24"
+                          >
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"></path>
+                          </svg>
+                        </button>
+                      </td>
 
-                    <!-- Aksi -->
-                    <td class="px-4 py-3 text-center space-x-1">
-                      <button @click="openModal('edit', item)" class="text-indigo-600 hover:text-indigo-900 bg-indigo-50 hover:bg-indigo-100 px-2.5 py-1 rounded-md font-medium transition">Edit</button>
-                      <button @click="openDeleteModal(item)" class="text-red-600 hover:text-red-900 bg-red-50 hover:bg-red-100 px-2.5 py-1 rounded-md font-medium transition">Hapus</button>
-                    </td>
-                  </tr>
+                      <td class="px-4 py-3 text-gray-500 font-medium">{{ startIndex + index + 1 }}</td>
+
+                      <!-- Nama Tim (Klik untuk buka Detail Tim) -->
+                      <td class="px-4 py-3">
+                        <button
+                          type="button"
+                          @click="openDetailModal(group)"
+                          class="font-bold text-gray-900 hover:text-blue-600 hover:underline text-left transition cursor-pointer inline-flex items-center gap-1.5 group"
+                          title="Klik untuk melihat detail tim & daftar anggota"
+                        >
+                          <span>{{ group.namaTim }}</span>
+                          <svg class="w-3.5 h-3.5 text-gray-400 group-hover:text-blue-600 transition" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"></path>
+                          </svg>
+                        </button>
+                      </td>
+
+                      <td class="px-4 py-3">
+                        <span class="bg-blue-50 text-blue-700 border border-blue-200 px-2 py-0.5 rounded font-semibold">
+                          {{ group.tahunLabel }}
+                        </span>
+                      </td>
+
+                      <!-- Ringkasan Ketua & Anggota -->
+                      <td class="px-4 py-3 text-center whitespace-nowrap">
+                        <div class="inline-flex items-center gap-1.5">
+                          <span class="bg-purple-50 text-purple-700 border border-purple-200 px-2 py-0.5 rounded-full text-[10px] font-bold">
+                            Ketua: {{ group.ketuaCount }}
+                          </span>
+                          <span class="bg-sky-50 text-sky-700 border border-sky-200 px-2 py-0.5 rounded-full text-[10px] font-bold">
+                            Anggota: {{ group.anggotaCount }}
+                          </span>
+                        </div>
+                      </td>
+
+                      <!-- Aksi Tim -->
+                      <td class="px-4 py-3 text-center whitespace-nowrap space-x-1.5">
+                        <button
+                          type="button"
+                          @click="openDetailModal(group)"
+                          class="text-sky-700 hover:text-sky-900 bg-sky-50 hover:bg-sky-100 border border-sky-200/70 px-2.5 py-1 rounded-md font-medium transition"
+                        >
+                          Detail
+                        </button>
+                        <button
+                          type="button"
+                          @click="toggleExpand(group.groupKey)"
+                          class="text-gray-700 hover:text-gray-900 bg-gray-100 hover:bg-gray-200 px-2.5 py-1 rounded-md font-medium transition"
+                        >
+                          {{ isExpanded(group.groupKey) ? 'Tutup' : 'Anggota' }}
+                        </button>
+                      </td>
+                    </tr>
+
+                    <!-- Baris Collapse: Daftar Ketua & Anggota Tim -->
+                    <tr v-if="isExpanded(group.groupKey)" class="bg-slate-50/80">
+                      <td colspan="6" class="px-4 sm:px-8 py-4 border-t border-b border-blue-100">
+                        <div class="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-xs">
+                          <div class="px-4 py-2.5 bg-gray-50 border-b border-gray-100 flex items-center justify-between gap-2">
+                            <div class="text-[11px] font-semibold text-gray-800">
+                              Anggota Tim <span class="text-blue-600">{{ group.namaTim }}</span> ({{ group.tahunLabel }})
+                            </div>
+                            <button
+                              type="button"
+                              @click="openModalForGroup(group)"
+                              class="text-[11px] font-semibold text-blue-600 hover:text-blue-800 bg-blue-50 hover:bg-blue-100 px-2.5 py-1 rounded-md transition"
+                            >
+                              + Tambah ke Tim Ini
+                            </button>
+                          </div>
+
+                          <div class="overflow-x-auto">
+                            <table class="min-w-full divide-y divide-gray-100 text-xs">
+                              <thead class="bg-white text-gray-500 text-[11px] uppercase">
+                                <tr>
+                                  <th class="px-3 py-2 text-center w-10">
+                                    <input
+                                      type="checkbox"
+                                      :checked="isGroupAllSelected(group)"
+                                      @change="toggleGroupSelectAll(group, $event)"
+                                      class="rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                                    />
+                                  </th>
+                                  <th class="px-3 py-2 text-left w-10">No</th>
+                                  <th class="px-3 py-2 text-left">Nama Pegawai</th>
+                                  <th class="px-3 py-2 text-left">Peran</th>
+                                  <th class="px-3 py-2 text-left">Keterangan</th>
+                                  <th class="px-3 py-2 text-center">Aksi</th>
+                                </tr>
+                              </thead>
+                              <tbody class="divide-y divide-gray-100 bg-white">
+                                <tr v-for="(member, mIdx) in group.orderedMembers" :key="member.ID_DETAIL_TIM" class="hover:bg-gray-50/70">
+                                  <td class="px-3 py-2 text-center">
+                                    <input
+                                      type="checkbox"
+                                      v-model="selectedIds"
+                                      :value="member.ID_DETAIL_TIM"
+                                      class="rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                                    />
+                                  </td>
+                                  <td class="px-3 py-2 text-gray-500">{{ mIdx + 1 }}</td>
+                                  <td class="px-3 py-2 font-semibold text-gray-900">{{ getMemberDisplayName(member) }}</td>
+                                  <td class="px-3 py-2">
+                                    <span
+                                      :class="isKetuaRole(member.PERAN) ? 'bg-purple-50 text-purple-700 border border-purple-200' : 'bg-blue-50 text-blue-700 border border-blue-200'"
+                                      class="px-2 py-0.5 text-[10px] font-bold rounded-full"
+                                    >
+                                      {{ member.PERAN || 'Anggota' }}
+                                    </span>
+                                  </td>
+                                  <td class="px-3 py-2 text-gray-600">{{ member.KETERANGAN || '-' }}</td>
+                                  <td class="px-3 py-2 text-center whitespace-nowrap">
+                                    <button @click="openDeleteModal(member)" class="text-red-600 hover:text-red-900 bg-red-50 hover:bg-red-100 px-2 py-1 rounded-md font-medium transition">Hapus</button>
+                                  </td>
+                                </tr>
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
+                      </td>
+                    </tr>
+                  </template>
                 </tbody>
               </table>
             </div>
@@ -156,18 +290,180 @@
 
         </div>
 
-        <!-- MODAL FORM TAMBAH / EDIT ANGGOTA TIM -->
+        <!-- MODAL DETAIL TIM & DAFTAR ANGGOTA -->
+        <div v-if="showDetailModal && detailGroup" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+          <div class="bg-white rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[90vh]">
+            
+            <!-- Header Modal Detail -->
+            <div class="bg-gradient-to-r from-blue-600 to-indigo-600 px-5 py-4 flex justify-between items-start text-white">
+              <div>
+                <div class="flex items-center gap-2 flex-wrap">
+                  <span class="bg-white/20 text-white text-[11px] font-semibold px-2.5 py-0.5 rounded-full">
+                    Tahun {{ detailGroup.tahunLabel || '-' }}
+                  </span>
+                  <span class="text-[11px] text-blue-100">ID Tim: {{ detailGroup.timId || '-' }}</span>
+                </div>
+                <h3 class="font-bold text-base mt-1.5">{{ detailGroup.namaTim }}</h3>
+              </div>
+              <button @click="closeDetailModal" class="text-blue-100 hover:text-white text-lg font-bold leading-none p-1">✕</button>
+            </div>
+
+            <!-- Konten Detail -->
+            <div class="p-5 overflow-y-auto space-y-5 text-xs">
+              
+              <!-- Informasi Detail Tim (Di atas) -->
+              <div class="bg-gray-50 border border-gray-100 rounded-xl p-4 space-y-2.5">
+                <div class="text-[11px] font-semibold uppercase tracking-wider text-gray-500">Informasi Tim</div>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <div class="text-[11px] text-gray-500">Nama Tim</div>
+                    <div class="font-semibold text-gray-800 mt-0.5">{{ detailGroup.namaTim }}</div>
+                  </div>
+                  <div>
+                    <div class="text-[11px] text-gray-500">Tahun Anggaran</div>
+                    <div class="font-semibold text-gray-800 mt-0.5">{{ detailGroup.tahunLabel || '-' }}</div>
+                  </div>
+                </div>
+                <div>
+                  <div class="text-[11px] text-gray-500">Keterangan Tim</div>
+                  <div class="text-gray-700 mt-0.5 leading-relaxed">{{ detailGroup.keteranganTim || 'Tidak ada keterangan tambahan.' }}</div>
+                </div>
+              </div>
+
+              <!-- Statistik Personel (Di bawah Informasi Detail Tim) -->
+              <div class="grid grid-cols-3 gap-3">
+                <div class="bg-slate-50 border border-slate-200/80 rounded-xl p-3">
+                  <div class="text-[11px] text-slate-500 font-medium">Total Personel</div>
+                  <div class="text-lg font-bold text-slate-800 mt-0.5">{{ detailGroup.members.length }}</div>
+                </div>
+                <div class="bg-purple-50/80 border border-purple-200/80 rounded-xl p-3">
+                  <div class="text-[11px] text-purple-700 font-medium">Ketua Tim</div>
+                  <div class="text-lg font-bold text-purple-800 mt-0.5">{{ detailGroup.ketuaCount }}</div>
+                </div>
+                <div class="bg-blue-50/70 border border-blue-200/80 rounded-xl p-3">
+                  <div class="text-[11px] text-blue-700 font-medium">Anggota Tim</div>
+                  <div class="text-lg font-bold text-blue-800 mt-0.5">{{ detailGroup.anggotaCount }}</div>
+                </div>
+              </div>
+
+              <!-- Daftar Ketua & Anggota -->
+              <div class="space-y-4">
+                <!-- Ketua -->
+                <div class="space-y-2">
+                  <div class="text-[11px] font-semibold uppercase tracking-wider text-purple-700">
+                    👑 Ketua Tim ({{ detailKetuaList.length }})
+                  </div>
+                  <div v-if="detailKetuaList.length === 0" class="text-[11px] text-gray-400 bg-gray-50 border border-dashed border-gray-200 rounded-xl p-3">
+                    Belum ada ketua tim yang terdaftar.
+                  </div>
+                  <div v-else class="space-y-2">
+                    <div
+                      v-for="(m, idx) in detailKetuaList"
+                      :key="m.ID_DETAIL_TIM || idx"
+                      class="p-3 rounded-xl bg-purple-50/60 border border-purple-200 flex items-center justify-between gap-2"
+                    >
+                      <div>
+                        <div class="font-semibold text-gray-900">{{ getMemberDisplayName(m) }}</div>
+                        <div class="text-[11px] text-gray-600 mt-0.5">{{ m.KETERANGAN || 'Ketua Tim' }}</div>
+                      </div>
+                      <div class="flex items-center gap-2">
+                        <span class="bg-purple-100 text-purple-800 text-[10px] font-bold px-2.5 py-0.5 rounded-full">
+                          {{ m.PERAN || 'Ketua' }}
+                        </span>
+                        <button
+                          type="button"
+                          @click="openDeleteModal(m)"
+                          class="text-red-600 hover:text-red-900 bg-red-50 hover:bg-red-100 border border-red-200/70 px-2 py-1 rounded-md text-[11px] font-medium transition"
+                          title="Hapus ketua dari tim"
+                        >
+                          Hapus
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Anggota -->
+                <div class="space-y-2">
+                  <div class="text-[11px] font-semibold uppercase tracking-wider text-blue-700">
+                    👥 Anggota Tim ({{ detailAnggotaList.length }})
+                  </div>
+                  <div v-if="detailAnggotaList.length === 0" class="text-[11px] text-gray-400 bg-gray-50 border border-dashed border-gray-200 rounded-xl p-3">
+                    Belum ada anggota tim yang terdaftar.
+                  </div>
+                  <div v-else class="border border-gray-200 rounded-xl overflow-hidden">
+                    <table class="min-w-full divide-y divide-gray-200 text-xs">
+                      <thead class="bg-gray-50 text-gray-500 text-[11px] uppercase">
+                        <tr>
+                          <th class="px-3 py-2 text-left w-10">No</th>
+                          <th class="px-3 py-2 text-left">Nama Pegawai</th>
+                          <th class="px-3 py-2 text-left">Peran</th>
+                          <th class="px-3 py-2 text-left">Keterangan</th>
+                          <th class="px-3 py-2 text-center w-20">Aksi</th>
+                        </tr>
+                      </thead>
+                      <tbody class="divide-y divide-gray-100 bg-white">
+                        <tr v-for="(m, idx) in detailAnggotaList" :key="m.ID_DETAIL_TIM || idx" class="hover:bg-gray-50/70">
+                          <td class="px-3 py-2 text-gray-500">{{ idx + 1 }}</td>
+                          <td class="px-3 py-2 font-semibold text-gray-900">{{ getMemberDisplayName(m) }}</td>
+                          <td class="px-3 py-2">
+                            <span class="bg-blue-50 text-blue-700 border border-blue-200 px-2 py-0.5 rounded-full text-[10px] font-semibold">
+                              {{ m.PERAN || 'Anggota' }}
+                            </span>
+                          </td>
+                          <td class="px-3 py-2 text-gray-600">{{ m.KETERANGAN || '-' }}</td>
+                          <td class="px-3 py-2 text-center whitespace-nowrap">
+                            <button
+                              type="button"
+                              @click="openDeleteModal(m)"
+                              class="text-red-600 hover:text-red-900 bg-red-50 hover:bg-red-100 px-2 py-1 rounded-md text-[11px] font-medium transition"
+                              title="Hapus anggota dari tim"
+                            >
+                              Hapus
+                            </button>
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+
+            </div>
+
+            <!-- Footer Modal Detail -->
+            <div class="px-5 py-3.5 bg-gray-50 border-t border-gray-100 flex items-center justify-between gap-2 text-xs">
+              <button
+                type="button"
+                @click="addMemberFromDetail"
+                class="px-3.5 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-lg font-semibold transition"
+              >
+                + Tambah Anggota
+              </button>
+              <button
+                type="button"
+                @click="closeDetailModal"
+                class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold shadow transition"
+              >
+                Tutup
+              </button>
+            </div>
+
+          </div>
+        </div>
+
+        <!-- MODAL FORM TAMBAH ANGGOTA TIM -->
         <div v-if="showModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm overflow-y-auto">
           <div class="bg-white rounded-xl shadow-xl w-full max-w-lg overflow-hidden my-8 transform transition-all">
             <div class="bg-blue-600 px-5 py-4 flex justify-between items-center text-white">
-              <h3 class="font-semibold text-sm">{{ isEditMode ? 'Edit Anggota Tim' : 'Tambah Anggota Tim Baru' }}</h3>
+              <h3 class="font-semibold text-sm">Tambah Anggota Tim Baru</h3>
               <button @click="closeModal" class="text-white/80 hover:text-white text-lg font-bold">✕</button>
             </div>
 
             <form @submit.prevent="submitForm" class="p-5 space-y-4 text-xs">
               <div class="space-y-3">
                 
-                <!-- Tahun Anggaran (Select dari Master Tahun) -->
+                <!-- Tahun Anggaran -->
                 <div>
                   <label class="block font-medium text-gray-700 mb-1">Tahun Anggaran <span class="text-red-500">*</span></label>
                   <select v-model="form.TAHUN_ID" @change="onTahunChange" required class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none bg-white">
@@ -176,10 +472,10 @@
                   </select>
                 </div>
 
-                <!-- Tim Kerja (Dependent Dropdown berdasarkan Tahun yang dipilih) -->
+                <!-- Tim Kerja -->
                 <div>
                   <label class="block font-medium text-gray-700 mb-1">Nama Tim Kerja <span class="text-red-500">*</span></label>
-                  <select v-model="form.TIM_ID" :disabled="!form.TAHUN_ID" required class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none bg-white disabled:bg-gray-100 disabled:cursor-not-allowed">
+                  <select v-model="form.TIM_ID" @change="onTimChange" :disabled="!form.TAHUN_ID" required class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none bg-white disabled:bg-gray-100 disabled:cursor-not-allowed">
                     <option value="">-- Pilih Tim Kerja --</option>
                     <option v-for="tim in filteredTimList" :value="tim.ID_TIM">{{ tim.NAMA_TIM }}</option>
                   </select>
@@ -195,25 +491,22 @@
                   </select>
                 </div>
 
-                <!-- Pegawai (Custom Multi-Select dengan Search & Tags) -->
+                <!-- Pegawai -->
                 <div>
                   <label class="block font-medium text-gray-700 mb-1">
                     Pegawai (Status Aktif) 
-                    <span v-if="!isEditMode && form.PERAN === 'Anggota'" class="text-[10px] text-blue-600 font-normal">(Bisa pilih lebih dari satu)</span>
+                    <span v-if="form.PERAN === 'Anggota'" class="text-[10px] text-blue-600 font-normal">(Bisa pilih lebih dari satu)</span>
                     <span class="text-red-500">*</span>
                   </label>
 
-                  <!-- Jika Mode Edit atau Peran Ketua: Gunakan Select Tunggal standar berurutan abjad -->
-                  <select v-if="isEditMode || form.PERAN === 'Ketua'" v-model="form.PEGAWAI_ID" required class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none bg-white">
+                  <select v-if="form.PERAN === 'Ketua'" v-model="form.PEGAWAI_ID" required class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none bg-white">
                     <option value="">-- Pilih Pegawai --</option>
                     <option v-for="pgw in sortedPegawaiList" :value="pgw.ID_PEGAWAI">
                       {{ pgw.NAMA_PEGAWAI }} (NIP: {{ pgw.NIP }})
                     </option>
                   </select>
 
-                  <!-- Jika Mode Tambah & Peran Anggota: Custom Multi-Select Search & Tags -->
                   <div v-else class="relative border border-gray-300 rounded-lg bg-white p-2 space-y-2">
-                    <!-- Area Badges / Tags yang terpilih -->
                     <div class="flex flex-wrap gap-1.5 min-h-[30px] items-center">
                       <span v-if="form.PEGAWAI_ID.length === 0" class="text-gray-400 text-[11px] px-1">Pilih pegawai dari daftar di bawah...</span>
                       <span v-for="id in form.PEGAWAI_ID" :key="id" class="inline-flex items-center bg-blue-50 text-blue-700 border border-blue-200 px-2 py-0.5 rounded-md text-[11px] font-medium">
@@ -222,12 +515,10 @@
                       </span>
                     </div>
 
-                    <!-- Kotak Pencarian / Search Bar -->
                     <div class="relative border-t border-gray-100 pt-2">
                       <input v-model="pgwSearchQuery" type="text" placeholder="🔍 Ketik nama pegawai untuk mencari..." class="w-full px-3 py-1.5 bg-gray-50 border border-gray-200 rounded-md focus:ring-1 focus:ring-blue-500 focus:outline-none text-xs" />
                     </div>
 
-                    <!-- Daftar Opsi dengan Scrollbar -->
                     <div class="max-h-40 overflow-y-auto space-y-0.5 divide-y divide-gray-50 border border-gray-100 rounded-md p-1 bg-white">
                       <div v-for="pgw in filteredDropdownPegawai" :key="pgw.ID_PEGAWAI" 
                            @click="toggleSelectPegawai(pgw.ID_PEGAWAI)" 
@@ -263,12 +554,16 @@
         </div>
 
         <!-- MODAL KONFIRMASI HAPUS -->
-        <div v-if="showDeleteModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+        <div v-if="showDeleteModal" class="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
           <div class="bg-white rounded-xl shadow-xl w-full max-w-sm overflow-hidden p-6 text-center space-y-4">
             <div class="w-12 h-12 bg-red-100 text-red-600 rounded-full flex items-center justify-center mx-auto text-xl font-bold">⚠️</div>
             <div>
               <h3 class="font-semibold text-sm text-gray-900">Konfirmasi Hapus</h3>
-              <p class="text-xs text-gray-600 mt-1">Apakah Anda yakin ingin menghapus penugasan anggota tim ini?</p>
+              <p class="text-xs text-gray-600 mt-1">
+                Apakah Anda yakin ingin menghapus
+                <span class="font-semibold text-gray-800">{{ selectedItem ? getMemberDisplayName(selectedItem) : 'anggota tim ini' }}</span>
+                dari tim?
+              </p>
             </div>
             <div class="flex justify-center space-x-2 pt-2">
               <button @click="closeDeleteModal" class="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg text-xs font-semibold hover:bg-gray-50 transition">Batal</button>
@@ -280,7 +575,7 @@
         </div>
 
         <!-- MODAL KONFIRMASI BATCH DELETE -->
-        <div v-if="showBatchDeleteModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+        <div v-if="showBatchDeleteModal" class="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
           <div class="bg-white rounded-xl shadow-xl w-full max-w-sm overflow-hidden p-6 text-center space-y-4">
             <div class="w-12 h-12 bg-red-100 text-red-600 rounded-full flex items-center justify-center mx-auto text-xl font-bold">⚠️</div>
             <div>
@@ -313,8 +608,10 @@
       const deleting = ref(false);
       const showModal = ref(false);
       const showDeleteModal = ref(false);
-      const isEditMode = ref(false);
+      const showDetailModal = ref(false);
       const selectedItem = ref(null);
+      const detailGroupKey = ref('');
+      const expandedKeys = ref([]);
 
       const toast = reactive({
         show: false,
@@ -330,8 +627,15 @@
       };
 
       const searchQuery = ref('');
+      const filterTahun = ref('');
       const perPage = ref(10);
       const currentPage = ref(1);
+
+      const resetFilter = () => {
+        searchQuery.value = '';
+        filterTahun.value = '';
+        currentPage.value = 1;
+      };
 
       const form = reactive({
         ID_DETAIL_TIM: '',
@@ -342,16 +646,23 @@
         KETERANGAN: ''
       });
 
-      // State untuk pencarian di dropdown pegawai
       const pgwSearchQuery = ref('');
 
-      // Helper untuk menampilkan nama pegawai berdasarkan ID di badge
-      const getPegawaiName = (id) => {
-        const found = masterData.pegawaiList.find(p => p.ID_PEGAWAI === id);
-        return found ? found.NAMA_PEGAWAI : id;
+      const isKetuaRole = (role) => {
+        return String(role || '').trim().toLowerCase().includes('ketua');
       };
 
-      // Fungsi memilih/membatalkan pilihan pegawai
+      const getPegawaiName = (id) => {
+        const found = masterData.pegawaiList.find(p => String(p.ID_PEGAWAI) === String(id));
+        return found ? found.NAMA_PEGAWAI : '';
+      };
+
+      const getMemberDisplayName = (member) => {
+        const fromLabel = member.PEGAWAI_LABEL || member.NAMA_PEGAWAI || member.NAMA || '';
+        const fromLookup = getPegawaiName(member.PEGAWAI_ID);
+        return fromLookup || fromLabel || 'Nama Pegawai Tidak Ditemukan';
+      };
+
       const toggleSelectPegawai = (id) => {
         if (!Array.isArray(form.PEGAWAI_ID)) form.PEGAWAI_ID = [];
         const index = form.PEGAWAI_ID.indexOf(id);
@@ -362,77 +673,62 @@
         }
       };
 
-      // Fungsi menghapus badge item terpilih
       const removeSelectedPegawai = (id) => {
         form.PEGAWAI_ID = form.PEGAWAI_ID.filter(item => item !== id);
       };
 
-      // 1. Computed untuk mendapatkan daftar pegawai yang BELUM terdaftar pada Tahun & Tim yang dipilih
       const availablePegawaiList = computed(() => {
-        // Jika Tahun atau Tim belum dipilih, kembalikan semua pegawai aktif
         if (!form.TAHUN_ID || !form.TIM_ID) {
           return masterData.pegawaiList;
         }
 
-        // Cari semua PEGAWAI_ID yang sudah ada di Tahun & Tim tersebut
         const existingPegawaiIds = timAnggotaList.value
-          .filter(item => 
-            item.TAHUN_ID === form.TAHUN_ID && 
-            item.TIM_ID === form.TIM_ID &&
-            // Jika mode edit, tetap izinkan pegawai yang sedang diedit muncul di pilihan
-            (!isEditMode.value || item.ID_DETAIL_TIM !== form.ID_DETAIL_TIM)
+          .filter(item =>
+            String(item.TAHUN_ID) === String(form.TAHUN_ID) &&
+            String(item.TIM_ID) === String(form.TIM_ID)
           )
-          .map(item => item.PEGAWAI_ID);
+          .map(item => String(item.PEGAWAI_ID));
 
-        // Kembalikan pegawai yang ID-nya belum ada di existingPegawaiIds
-        return masterData.pegawaiList.filter(pgw => !existingPegawaiIds.includes(pgw.ID_PEGAWAI));
+        return masterData.pegawaiList.filter(pgw => !existingPegawaiIds.includes(String(pgw.ID_PEGAWAI)));
       });
 
-      // 2. Perbarui sortedPegawaiList (untuk select tunggal Ketua/Edit) agar menggunakan availablePegawaiList
       const sortedPegawaiList = computed(() => {
         return [...availablePegawaiList.value].sort((a, b) => {
-          return a.NAMA_PEGAWAI.localeCompare(b.NAMA_PEGAWAI, 'id', { sensitivity: 'base' });
+          return String(a.NAMA_PEGAWAI || '').localeCompare(String(b.NAMA_PEGAWAI || ''), 'id', { sensitivity: 'base' });
         });
       });
 
-      // 3. Perbarui filteredDropdownPegawai (untuk multi-select Anggota) agar menggunakan sortedPegawaiList
       const filteredDropdownPegawai = computed(() => {
         const q = pgwSearchQuery.value.toLowerCase();
         if (!q) return sortedPegawaiList.value;
 
-        return sortedPegawaiList.value.filter(p => 
-          p.NAMA_PEGAWAI.toLowerCase().includes(q) || 
-          String(p.NIP).toLowerCase().includes(q)
+        return sortedPegawaiList.value.filter(p =>
+          String(p.NAMA_PEGAWAI || '').toLowerCase().includes(q) ||
+          String(p.NIP || '').toLowerCase().includes(q)
         );
       });
 
-      // Computed untuk dependent dropdown: filter tim berdasarkan TAHUN_ID yang dipilih di form
       const filteredTimList = computed(() => {
         if (!form.TAHUN_ID) return [];
-        return masterData.timList.filter(tim => tim.TAHUN_ID === form.TAHUN_ID);
+        return masterData.timList.filter(tim => String(tim.TAHUN_ID) === String(form.TAHUN_ID));
       });
 
       const onTahunChange = () => {
         form.TIM_ID = '';
-        form.PEGAWAI_ID = (isEditMode.value || form.PERAN === 'Ketua') ? '' : [];
+        form.PEGAWAI_ID = form.PERAN === 'Ketua' ? '' : [];
       };
 
       const onTimChange = () => {
-        if (!isEditMode.value) {
-          form.PEGAWAI_ID = form.PERAN === 'Ketua' ? '' : [];
-        }
+        form.PEGAWAI_ID = form.PERAN === 'Ketua' ? '' : [];
       };
 
-      // Tambahkan fungsi ini di dalam setup() untuk mereset/menyesuaikan pegawai saat peran diubah
       const onPeranChange = () => {
         form.PEGAWAI_ID = form.PERAN === 'Ketua' ? '' : [];
       };
 
-
       const fetchData = () => {
         loading.value = true;
         if (typeof google !== 'undefined' && google.script) {
-          // Ambil data utama dan data referensi master secara paralel
           google.script.run
             .withSuccessHandler((data) => {
               timAnggotaList.value = data || [];
@@ -458,28 +754,152 @@
         }
       };
 
-      const filteredList = computed(() => {
-        return timAnggotaList.value.filter(item => {
-          const q = searchQuery.value.toLowerCase();
-          return !q || 
-                 (item.PERAN && item.PERAN.toLowerCase().includes(q)) || 
-                 (item.KETERANGAN && item.KETERANGAN.toLowerCase().includes(q)) ||
-                 (item.TAHUN_LABEL && String(item.TAHUN_LABEL).toLowerCase().includes(q)) ||
-                 (item.TIM_LABEL && String(item.TIM_LABEL).toLowerCase().includes(q)) ||
-                 (item.PEGAWAI_LABEL && String(item.PEGAWAI_LABEL).toLowerCase().includes(q));
+      // Kelompokkan data anggota per Tim (+ Tahun) agar tabel utama menampilkan nama tim & bisa di-collapse
+      const groupedTimList = computed(() => {
+        const q = searchQuery.value.trim().toLowerCase();
+        const thnFilter = filterTahun.value;
+        const groupsMap = new Map();
+
+        timAnggotaList.value.forEach(item => {
+          const tahunId = String(item.TAHUN_ID || '');
+          const timId = String(item.TIM_ID || '');
+          const key = `${tahunId}__${timId}`;
+
+          const timMaster = masterData.timList.find(t => String(t.ID_TIM) === timId) || {};
+          const tahunLabel = item.TAHUN_LABEL || timMaster.TAHUN_LABEL || tahunId || '-';
+          const namaTim = item.TIM_LABEL || timMaster.NAMA_TIM || timId || '-';
+          const keteranganTim = timMaster.KETERANGAN || '';
+
+          if (!groupsMap.has(key)) {
+            groupsMap.set(key, {
+              groupKey: key,
+              tahunId: item.TAHUN_ID || '',
+              timId: item.TIM_ID || '',
+              tahunLabel,
+              namaTim,
+              keteranganTim,
+              members: []
+            });
+          }
+          groupsMap.get(key).members.push(item);
+        });
+
+        const result = [];
+        groupsMap.forEach(group => {
+          const matchTahun = thnFilter === '' || String(group.tahunId) === String(thnFilter);
+          if (!matchTahun) return;
+
+          const matchingMembers = !q
+            ? group.members
+            : group.members.filter(m => {
+                const namaPegawai = getMemberDisplayName(m).toLowerCase();
+                const peran = String(m.PERAN || '').toLowerCase();
+                const ket = String(m.KETERANGAN || '').toLowerCase();
+                const namaTim = String(group.namaTim || '').toLowerCase();
+                const tahunLabel = String(group.tahunLabel || '').toLowerCase();
+                return (
+                  namaPegawai.includes(q) ||
+                  peran.includes(q) ||
+                  ket.includes(q) ||
+                  namaTim.includes(q) ||
+                  tahunLabel.includes(q)
+                );
+              });
+
+          if (matchingMembers.length > 0) {
+            const orderedMembers = [...matchingMembers].sort((a, b) => {
+              const aKetua = isKetuaRole(a.PERAN) ? 0 : 1;
+              const bKetua = isKetuaRole(b.PERAN) ? 0 : 1;
+              if (aKetua !== bKetua) return aKetua - bKetua;
+              return getMemberDisplayName(a).localeCompare(getMemberDisplayName(b), 'id', { sensitivity: 'base' });
+            });
+
+            const ketuaCount = group.members.filter(m => isKetuaRole(m.PERAN)).length;
+            const anggotaCount = group.members.length - ketuaCount;
+
+            result.push({
+              ...group,
+              orderedMembers,
+              ketuaCount,
+              anggotaCount
+            });
+          }
+        });
+
+        return result.sort((a, b) => {
+          const thnCmp = String(b.tahunLabel).localeCompare(String(a.tahunLabel), undefined, { numeric: true });
+          if (thnCmp !== 0) return thnCmp;
+          return String(a.namaTim).localeCompare(String(b.namaTim), 'id', { sensitivity: 'base' });
         });
       });
 
-      const totalPages = computed(() => Math.ceil(filteredList.value.length / perPage.value));
+      const isExpanded = (key) => expandedKeys.value.includes(key);
+
+      const toggleExpand = (key) => {
+        const idx = expandedKeys.value.indexOf(key);
+        if (idx > -1) {
+          expandedKeys.value.splice(idx, 1);
+        } else {
+          expandedKeys.value.push(key);
+        }
+      };
+
+      const areAllExpanded = computed(() => {
+        if (groupedTimList.value.length === 0) return false;
+        return groupedTimList.value.every(g => expandedKeys.value.includes(g.groupKey));
+      });
+
+      const toggleExpandAll = () => {
+        if (areAllExpanded.value) {
+          expandedKeys.value = [];
+        } else {
+          expandedKeys.value = groupedTimList.value.map(g => g.groupKey);
+        }
+      };
+
+      const detailGroup = computed(() => {
+        if (!detailGroupKey.value) return null;
+        return groupedTimList.value.find(g => g.groupKey === detailGroupKey.value) || null;
+      });
+
+      const detailKetuaList = computed(() => {
+        if (!detailGroup.value) return [];
+        return detailGroup.value.members.filter(m => isKetuaRole(m.PERAN));
+      });
+
+      const detailAnggotaList = computed(() => {
+        if (!detailGroup.value) return [];
+        return detailGroup.value.members.filter(m => !isKetuaRole(m.PERAN));
+      });
+
+      const openDetailModal = (group) => {
+        detailGroupKey.value = group.groupKey;
+        showDetailModal.value = true;
+      };
+
+      const closeDetailModal = () => {
+        showDetailModal.value = false;
+        detailGroupKey.value = '';
+      };
+
+      const addMemberFromDetail = () => {
+        const target = detailGroup.value ? { ...detailGroup.value } : null;
+        closeDetailModal();
+        if (target) {
+          openModalForGroup(target);
+        }
+      };
+
+      const totalPages = computed(() => Math.ceil(groupedTimList.value.length / perPage.value));
       const startIndex = computed(() => (currentPage.value - 1) * perPage.value);
-      const paginatedList = computed(() => filteredList.value.slice(startIndex.value, startIndex.value + perPage.value));
+      const paginatedList = computed(() => groupedTimList.value.slice(startIndex.value, startIndex.value + perPage.value));
 
       const paginationInfo = computed(() => {
-        const total = filteredList.value.length;
-        if (total === 0) return 'Menampilkan 0 data';
+        const total = groupedTimList.value.length;
+        if (total === 0) return 'Menampilkan 0 tim';
         const start = startIndex.value + 1;
         const end = Math.min(startIndex.value + perPage.value, total);
-        return `Menampilkan ${start} - ${end} dari ${total} data`;
+        return `Menampilkan ${start} - ${end} dari ${total} tim`;
       });
 
       const displayedPages = computed(() => {
@@ -495,21 +915,29 @@
         if (page >= 1 && page <= totalPages.value) currentPage.value = page;
       };
 
-      const openModal = (mode, item = null) => {
-        if (mode === 'edit' && item) {
-          isEditMode.value = true;
-          Object.assign(form, item);
-        } else {
-          isEditMode.value = false;
-          Object.assign(form, {
-            ID_DETAIL_TIM: '',
-            TAHUN_ID: '',
-            TIM_ID: '',
-            PEGAWAI_ID: '',
-            PERAN: 'Anggota',
-            KETERANGAN: ''
-          });
-        }
+      const openModal = () => {
+        pgwSearchQuery.value = '';
+        Object.assign(form, {
+          ID_DETAIL_TIM: '',
+          TAHUN_ID: '',
+          TIM_ID: '',
+          PEGAWAI_ID: [],
+          PERAN: 'Anggota',
+          KETERANGAN: ''
+        });
+        showModal.value = true;
+      };
+
+      const openModalForGroup = (group) => {
+        pgwSearchQuery.value = '';
+        Object.assign(form, {
+          ID_DETAIL_TIM: '',
+          TAHUN_ID: group.tahunId || '',
+          TIM_ID: group.timId || '',
+          PEGAWAI_ID: [],
+          PERAN: 'Anggota',
+          KETERANGAN: ''
+        });
         showModal.value = true;
       };
 
@@ -549,6 +977,7 @@
 
       const executeDelete = () => {
         if (!selectedItem.value) return;
+        const deletedId = selectedItem.value.ID_DETAIL_TIM;
         deleting.value = true;
 
         if (typeof google !== 'undefined' && google.script) {
@@ -557,6 +986,7 @@
               deleting.value = false;
               closeDeleteModal();
               if (res.success) {
+                selectedIds.value = selectedIds.value.filter(id => id !== deletedId);
                 fetchData();
                 showToast(res.message, 'success');
               } else {
@@ -568,31 +998,28 @@
               closeDeleteModal();
               showToast('Gagal menghapus: ' + err.message, 'error');
             })
-            .deleteTimAnggota(selectedItem.value.ID_DETAIL_TIM);
+            .deleteTimAnggota(deletedId);
         }
       };
 
-      // State untuk menampung ID baris yang dicentang
       const selectedIds = ref([]);
       const showBatchDeleteModal = ref(false);
 
-      // Cek apakah semua data di halaman aktif sedang dicentang
-      const isAllSelected = computed(() => {
-        if (paginatedList.value.length === 0) return false;
-        return paginatedList.value.every(item => selectedIds.value.includes(item.ID_DETAIL_TIM));
-      });
+      const isGroupAllSelected = (group) => {
+        if (!group.orderedMembers || group.orderedMembers.length === 0) return false;
+        return group.orderedMembers.every(m => selectedIds.value.includes(m.ID_DETAIL_TIM));
+      };
 
-      // Handler pilih semua / batalkan pilih semua di halaman aktif
-      const toggleSelectAll = (e) => {
+      const toggleGroupSelectAll = (group, e) => {
+        const groupMemberIds = (group.orderedMembers || []).map(m => m.ID_DETAIL_TIM);
         if (e.target.checked) {
-          paginatedList.value.forEach(item => {
-            if (!selectedIds.value.includes(item.ID_DETAIL_TIM)) {
-              selectedIds.value.push(item.ID_DETAIL_TIM);
+          groupMemberIds.forEach(id => {
+            if (!selectedIds.value.includes(id)) {
+              selectedIds.value.push(id);
             }
           });
         } else {
-          const pageIds = paginatedList.value.map(item => item.ID_DETAIL_TIM);
-          selectedIds.value = selectedIds.value.filter(id => !pageIds.includes(id));
+          selectedIds.value = selectedIds.value.filter(id => !groupMemberIds.includes(id));
         }
       };
 
@@ -614,7 +1041,7 @@
               deleting.value = false;
               closeBatchDeleteModal();
               if (res.success) {
-                selectedIds.value = []; // Reset pilihan
+                selectedIds.value = [];
                 fetchData();
                 showToast(res.message, 'success');
               } else {
@@ -633,11 +1060,16 @@
       onMounted(() => { fetchData(); });
 
       return {
-        timAnggotaList, masterData, loading, saving, deleting, showModal, showDeleteModal, isEditMode, form,
-        searchQuery, perPage, currentPage, totalPages, startIndex, paginatedList, paginationInfo,
-        displayedPages, toast, filteredTimList, onTahunChange, onPeranChange, changePage, openModal, closeModal, submitForm,
-        openDeleteModal, closeDeleteModal, executeDelete, fetchData, selectedItem,
-        pgwSearchQuery, getPegawaiName, toggleSelectPegawai, removeSelectedPegawai, filteredDropdownPegawai, sortedPegawaiList, selectedIds, showBatchDeleteModal, isAllSelected, toggleSelectAll, openBatchDeleteModal, closeBatchDeleteModal, executeBatchDelete
+        timAnggotaList, masterData, loading, saving, deleting, showModal, showDeleteModal, showDetailModal,
+        form, searchQuery, filterTahun, resetFilter, perPage, currentPage, totalPages, startIndex,
+        paginatedList, paginationInfo, displayedPages, toast, filteredTimList, onTahunChange, onTimChange,
+        onPeranChange, changePage, openModal, openModalForGroup, closeModal, submitForm, openDeleteModal,
+        closeDeleteModal, executeDelete, fetchData, selectedItem, pgwSearchQuery, getPegawaiName,
+        getMemberDisplayName, isKetuaRole, toggleSelectPegawai, removeSelectedPegawai, filteredDropdownPegawai,
+        sortedPegawaiList, selectedIds, showBatchDeleteModal, isGroupAllSelected, toggleGroupSelectAll,
+        openBatchDeleteModal, closeBatchDeleteModal, executeBatchDelete, groupedTimList, isExpanded,
+        toggleExpand, areAllExpanded, toggleExpandAll, detailGroup, detailKetuaList, detailAnggotaList,
+        openDetailModal, closeDetailModal, addMemberFromDetail
       };
     }
   };
