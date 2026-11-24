@@ -73,6 +73,7 @@
                   </tr>
                 </thead>
                 <tbody class="divide-y divide-gray-200 bg-white">
+                  <!-- Loading State -->
                   <tr v-if="loading">
                     <td colspan="5" class="px-4 py-8 text-center text-gray-400">
                       <div class="inline-block w-6 h-6 border-2 border-blue-600 border-t-transparent rounded-full animate-spin mr-2"></div>
@@ -80,10 +81,27 @@
                     </td>
                   </tr>
 
+                  <!-- State Kosong yang Disempurnakan -->
                   <tr v-else-if="paginatedList.length === 0">
-                    <td colspan="5" class="px-4 py-8 text-center text-gray-400">Tidak ada data Tahun yang ditemukan.</td>
+                    <td colspan="5" class="px-4 py-12 text-center">
+                      <div class="flex flex-col items-center justify-center space-y-2">
+                        <div class="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center text-gray-400">
+                          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"/></svg>
+                        </div>
+                        <p class="font-medium text-gray-700">
+                          {{ tahunList.length === 0 ? 'Belum ada data tahun.' : 'Tidak ada data tahun yang sesuai dengan pencarian.' }}
+                        </p>
+                        <p class="text-[11px] text-gray-400">
+                          {{ tahunList.length === 0 ? 'Silakan tambahkan tahun baru melalui tombol di atas.' : 'Coba ubah kata kunci pencarian atau reset filter.' }}
+                        </p>
+                        <button v-if="tahunList.length > 0 && searchQuery" @click="resetSearch" class="mt-2 px-3 py-1 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-md font-medium transition">
+                          Reset Pencarian
+                        </button>
+                      </div>
+                    </td>
                   </tr>
 
+                  <!-- Data Row -->
                   <tr v-else v-for="(item, index) in paginatedList" :key="item.ID_TAHUN" class="hover:bg-gray-50 transition">
                     <td class="px-4 py-3 text-gray-500 font-medium">{{ startIndex + index + 1 }}</td>
                     <td class="px-4 py-3 font-bold text-gray-900 text-sm">{{ item.TAHUN }}</td>
@@ -206,10 +224,16 @@
         KETERANGAN: ''
       });
 
+      // Fungsi Reset Pencarian
+      const resetSearch = () => {
+        searchQuery.value = '';
+        currentPage.value = 1;
+      };
+
       const fetchTahun = () => {
         loading.value = true;
         if (typeof google !== 'undefined' && google.script) {
-          google.script.run
+          appRun
             .withSuccessHandler((data) => {
               tahunList.value = data || [];
               loading.value = false;
@@ -274,7 +298,7 @@
       const submitForm = () => {
         saving.value = true;
         if (typeof google !== 'undefined' && google.script) {
-          google.script.run
+          appRun
             .withSuccessHandler((res) => {
               saving.value = false;
               if (res.success) {
@@ -308,7 +332,7 @@
         deleting.value = true;
 
         if (typeof google !== 'undefined' && google.script) {
-          google.script.run
+          appRun
             .withSuccessHandler((res) => {
               deleting.value = false;
               closeDeleteModal();
@@ -333,7 +357,7 @@
       return {
         tahunList, loading, saving, deleting, showModal, showDeleteModal, isEditMode, form,
         searchQuery, perPage, currentPage, totalPages, startIndex, paginatedList, paginationInfo,
-        displayedPages, toast, changePage, openModal, closeModal, submitForm,
+        displayedPages, toast, resetSearch, changePage, openModal, closeModal, submitForm,
         openDeleteModal, closeDeleteModal, executeDelete, fetchTahun, selectedItem
       };
     }

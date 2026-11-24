@@ -14,7 +14,7 @@ var PEGAWAI_REFERENCES_ = [
  * Fungsi helper untuk mendapatkan objek Sheet 'MASTER_PEGAWAI'.
  * Jika sheet belum ada, otomatis dibuatkan beserta header kolom lengkapnya.
  */
-function getPegawaiSheet() {
+function getPegawaiSheet_() {
   return getOrCreateSheet_('MASTER_PEGAWAI', [
     'ID_PEGAWAI', 'NAMA_PEGAWAI', 'NIP_LAMA', 'NIP_BARU', 'GOL_RUANG',
     'JENIS_KELAMIN', 'TANGGAL_LAHIR', 'ALAMAT', 'JABATAN', 'NO_HP',
@@ -26,9 +26,9 @@ function getPegawaiSheet() {
 /**
  * 1. READ: Mengambil seluruh data pegawai dari sheet.
  */
-function getPegawaiList() {
+function getPegawaiList_() {
   try {
-    return readObjects_(getPegawaiSheet(), ['TANGGAL_LAHIR']);
+    return readObjects_(getPegawaiSheet_(), ['TANGGAL_LAHIR']);
   } catch (error) {
     throw new Error("Gagal mengambil data pegawai: " + error.message);
   }
@@ -37,10 +37,10 @@ function getPegawaiList() {
 /**
  * 2. CREATE / UPDATE: Menyimpan atau memperbarui data pegawai.
  */
-function savePegawai(formData) {
+function savePegawai_(formData) {
   try {
     return withLock_(function () {
-      var sheet = getPegawaiSheet();
+      var sheet = getPegawaiSheet_();
       var headers = getHeaders_(sheet);
 
       var now = nowString_();
@@ -77,10 +77,10 @@ function savePegawai(formData) {
  * 3. DELETE: Menghapus data pegawai berdasarkan ID_PEGAWAI.
  * Ditolak jika pegawai masih terdaftar sebagai Anggota Tim.
  */
-function deletePegawai(idPegawai) {
+function deletePegawai_(idPegawai) {
   try {
     return withLock_(function () {
-      var sheet = getPegawaiSheet();
+      var sheet = getPegawaiSheet_();
       var rowIndex = findRowById_(sheet, 'ID_PEGAWAI', idPegawai);
 
       if (!rowIndex) {

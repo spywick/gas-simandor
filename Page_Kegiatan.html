@@ -317,7 +317,7 @@
       const fetchData = () => {
         loading.value = true;
         if (typeof google !== 'undefined' && google.script) {
-          google.script.run
+          appRun
             .withSuccessHandler((data) => {
               kegiatanList.value = data || [];
               loading.value = false;
@@ -328,11 +328,11 @@
             })
             .getKegiatanList();
 
-          google.script.run
+          appRun
             .withSuccessHandler((data) => { tahunOptions.value = data || []; })
             .getTahunList();
 
-          google.script.run
+          appRun
             .withSuccessHandler((data) => { timOptions.value = data || []; })
             .getTimList();
         } else {
@@ -415,7 +415,7 @@
       const submitForm = () => {
         saving.value = true;
         if (typeof google !== 'undefined' && google.script) {
-          google.script.run
+          appRun
             .withSuccessHandler((res) => {
               saving.value = false;
               if (res.success) {
@@ -449,7 +449,7 @@
         deleting.value = true;
 
         if (typeof google !== 'undefined' && google.script) {
-          google.script.run
+          appRun
             .withSuccessHandler((res) => {
               deleting.value = false;
               closeDeleteModal();

@@ -9,16 +9,16 @@
  * Fungsi helper untuk mendapatkan objek Sheet 'MASTER_SATUAN'.
  * Jika sheet belum ada, otomatis dibuatkan beserta header kolomnya.
  */
-function getSatuanSheet() {
+function getSatuanSheet_() {
   return getOrCreateSheet_('MASTER_SATUAN', ['ID_SATUAN', 'NAMA_SATUAN', 'KETERANGAN', 'CREATED_AT']);
 }
 
 /**
  * 1. READ: Mengambil seluruh data satuan dari sheet.
  */
-function getSatuanList() {
+function getSatuanList_() {
   try {
-    return readObjects_(getSatuanSheet());
+    return readObjects_(getSatuanSheet_());
   } catch (error) {
     throw new Error("Gagal mengambil data satuan: " + error.message);
   }
@@ -27,10 +27,10 @@ function getSatuanList() {
 /**
  * 2. CREATE / UPDATE: Menyimpan atau memperbarui data satuan (dengan validasi nama unik).
  */
-function saveSatuan(formData) {
+function saveSatuan_(formData) {
   try {
     return withLock_(function () {
-      var sheet = getSatuanSheet();
+      var sheet = getSatuanSheet_();
       var headers = getHeaders_(sheet);
 
       // Validasi duplikasi nama satuan (tidak peka huruf besar/kecil)
@@ -69,10 +69,10 @@ function saveSatuan(formData) {
  * (Belum ada tabel yang mereferensikan satuan. Tambahkan pengecekan referensi
  *  di sini begitu tabel honor/kegiatan memakai ID_SATUAN.)
  */
-function deleteSatuan(idSatuan) {
+function deleteSatuan_(idSatuan) {
   try {
     return withLock_(function () {
-      var sheet = getSatuanSheet();
+      var sheet = getSatuanSheet_();
       var rowIndex = findRowById_(sheet, 'ID_SATUAN', idSatuan);
 
       if (rowIndex) {

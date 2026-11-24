@@ -16,64 +16,251 @@
 </head>
 <body class="bg-[#f1f5f9] font-sans">
 
-  <div id="app" class="flex min-h-screen w-full overflow-x-hidden">
-    
-    <!-- Sidebar -->
-    <?!= include('Sidebar'); ?>
+  <div id="app">
 
-    <!-- Main Content Wrapper -->
-    <div class="flex-1 flex flex-col h-screen overflow-y-auto min-w-0 w-full">
-      
-      <!-- Top Header (Sticky) -->
-      <header class="bg-white shadow-sm px-6 py-4 flex justify-between items-center border-b border-gray-100 sticky top-0 z-40 flex-shrink-0">
-        <div class="flex items-center space-x-4">
-          <button @click="toggleSidebar" class="md:hidden text-gray-600 hover:text-gray-800 focus:outline-none">
-            <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16"></path>
-            </svg>
-          </button>
-          
-          <div class="text-xs text-gray-400 font-medium">
-            Application <span class="mx-1">/</span> <span class="text-blue-600 capitalize font-semibold">{{ currentMenu.replace('_', ' ') }}</span>
+    <!-- ===================== MEMERIKSA SESI ===================== -->
+    <div v-if="appAuth.checking" class="min-h-screen flex items-center justify-center text-sm text-gray-500">
+      <div class="w-6 h-6 border-2 border-blue-600 border-t-transparent rounded-full animate-spin mr-3"></div>
+      Memeriksa sesi...
+    </div>
+
+    <!-- ========================= HALAMAN LOGIN ========================= -->
+    <div v-else-if="!appAuth.user" class="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-[#1b31a8] via-blue-700 to-blue-500">
+      <div class="w-full max-w-sm">
+        <div class="bg-white rounded-2xl shadow-2xl overflow-hidden">
+          <div class="px-6 pt-7 pb-4 text-center">
+            <img src="https://lh3.googleusercontent.com/d/1C4qrN0Gqck_xUcdFaLR0-J8RRiDnLAPA" alt="Logo SIMANDOR" class="h-14 mx-auto object-contain" />
+            <h1 class="mt-3 text-xl font-bold text-gray-900 tracking-wide">SIMANDOR</h1>
+            <p class="text-[11px] text-gray-500">Sistem Informasi Monitoring Kinerja dan Honor</p>
           </div>
+
+          <form @submit.prevent="submitLogin" class="px-6 pb-6 space-y-4 text-xs">
+            <div v-if="appAuth.notice" class="bg-amber-50 border border-amber-200 text-amber-800 rounded-lg px-3 py-2">
+              {{ appAuth.notice }}
+            </div>
+
+            <div>
+              <label class="block font-medium text-gray-700 mb-1">Email</label>
+              <input v-model="loginForm.email" type="email" autocomplete="username" required placeholder="nama@email.com"
+                     class="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none" />
+            </div>
+
+            <div>
+              <label class="block font-medium text-gray-700 mb-1">Password</label>
+              <div class="relative">
+                <input v-model="loginForm.password" :type="loginForm.showPassword ? 'text' : 'password'" autocomplete="current-password" required placeholder="••••••••"
+                       class="w-full px-3 py-2.5 pr-16 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none" />
+                <button type="button" @click="loginForm.showPassword = !loginForm.showPassword"
+                        class="absolute inset-y-0 right-0 px-3 text-[11px] font-semibold text-gray-500 hover:text-blue-600">
+                  {{ loginForm.showPassword ? 'Sembunyi' : 'Tampil' }}
+                </button>
+              </div>
+            </div>
+
+            <p v-if="loginForm.error" class="bg-red-50 border border-red-200 text-red-700 rounded-lg px-3 py-2">⚠️ {{ loginForm.error }}</p>
+
+            <button type="submit" :disabled="loginForm.loading"
+                    class="w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold shadow transition disabled:opacity-60 flex items-center justify-center">
+              <span v-if="loginForm.loading" class="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></span>
+              <span>{{ loginForm.loading ? 'Memproses...' : 'Masuk' }}</span>
+            </button>
+
+            <p class="text-center text-[11px] text-gray-400">Lupa password? Hubungi administrator.</p>
+          </form>
+        </div>
+        <p class="text-center text-[11px] text-blue-100 mt-4">&copy; 2026 - {{ currentYear }} SIMANDOR</p>
+      </div>
+    </div>
+
+    <!-- ============================ APLIKASI ============================ -->
+    <div v-else class="flex min-h-screen w-full overflow-x-hidden">
+
+      <!-- Toast global -->
+      <div v-if="toast.show" :class="toast.type === 'success' ? 'bg-green-600' : 'bg-red-600'" class="fixed top-5 right-5 z-[60] text-white px-4 py-3 rounded-xl shadow-lg flex items-center space-x-2 text-xs">
+        <span>{{ toast.type === 'success' ? '✅' : '⚠️' }}</span>
+        <span class="font-medium">{{ toast.message }}</span>
+      </div>
+
+      <!-- Sidebar -->
+      <?!= include_('Sidebar'); ?>
+
+      <!-- Main Content Wrapper -->
+      <div class="flex-1 flex flex-col h-screen overflow-y-auto min-w-0 w-full">
+        
+        <!-- Top Header (Sticky) -->
+        <header class="bg-white shadow-sm px-6 py-4 flex justify-between items-center border-b border-gray-100 sticky top-0 z-40 flex-shrink-0">
+          <div class="flex items-center space-x-4">
+            <button @click="toggleSidebar" class="md:hidden text-gray-600 hover:text-gray-800 focus:outline-none">
+              <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16"></path>
+              </svg>
+            </button>
+            
+            <div class="text-xs text-gray-400 font-medium">
+              Application <span class="mx-1">/</span> <span class="text-blue-600 capitalize font-semibold">{{ activeMenu.replace('_', ' ') }}</span>
+            </div>
+          </div>
+
+          <div class="flex items-center space-x-3">
+            <div class="hidden md:flex text-sm font-medium text-gray-600 bg-gray-50 px-3 py-1.5 rounded-lg border border-gray-200 shadow-inner items-center space-x-1.5">
+              <span>🕒</span>
+              <span>{{ currentTime }}</span>
+            </div>
+
+            <!-- Menu pengguna -->
+            <div class="relative" @click.stop>
+              <button @click="userMenuOpen = !userMenuOpen" class="flex items-center space-x-2 px-2 py-1.5 rounded-lg border border-gray-200 hover:bg-gray-50 transition">
+                <span class="w-8 h-8 rounded-full bg-blue-100 text-blue-700 font-bold flex items-center justify-center text-xs">{{ initials(appAuth.user.NAMA) }}</span>
+                <span class="hidden sm:flex flex-col text-left leading-tight">
+                  <span class="text-xs font-semibold text-gray-800 max-w-[140px] truncate">{{ appAuth.user.NAMA }}</span>
+                  <span class="text-[10px] uppercase font-semibold" :class="isAdmin ? 'text-purple-600' : 'text-blue-600'">{{ appAuth.user.LEVEL }}</span>
+                </span>
+                <span class="text-gray-400 text-[10px]">▼</span>
+              </button>
+
+              <div v-if="userMenuOpen" class="absolute right-0 mt-2 w-56 bg-white border border-gray-200 rounded-xl shadow-lg py-1 text-xs z-50">
+                <div class="px-3 py-2 border-b border-gray-100">
+                  <p class="font-semibold text-gray-800 truncate">{{ appAuth.user.NAMA }}</p>
+                  <p class="text-gray-500 truncate">{{ appAuth.user.EMAIL }}</p>
+                </div>
+                <button @click="openChangePassword" class="w-full text-left px-3 py-2 hover:bg-gray-50 text-gray-700">🔑 Ubah Password</button>
+                <button @click="logout" class="w-full text-left px-3 py-2 hover:bg-red-50 text-red-600">⎋ Keluar</button>
+              </div>
+            </div>
+          </div>
+        </header>
+
+        <!-- Main Content Area -->
+        <div class="flex-1 flex flex-col justify-between w-full">
+          <main class="p-4 sm:p-6 w-full">
+            <keep-alive>
+              <component :is="'page-' + activeMenu"></component>
+            </keep-alive>
+          </main>
+
+          <footer class="bg-white border-t border-gray-100 py-4 px-6 text-center text-xs text-gray-500 flex-shrink-0">
+            <span>Copyright &copy; 2026 - {{ currentYear }} SIMANDOR. All rights reserved.</span>
+          </footer>
         </div>
 
-        <div class="hidden md:flex text-sm font-medium text-gray-600 bg-gray-50 px-3 py-1.5 rounded-lg border border-gray-200 shadow-inner items-center space-x-1.5">
-          <span>🕒</span>
-          <span>{{ currentTime }}</span>
+      </div>
+
+      <!-- Modal Ubah Password -->
+      <div v-if="pwForm.show" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+        <div class="bg-white rounded-xl shadow-xl w-full max-w-sm overflow-hidden">
+          <div class="bg-blue-600 px-5 py-4 flex justify-between items-center text-white">
+            <h3 class="font-semibold text-sm">Ubah Password</h3>
+            <button @click="pwForm.show = false" class="text-blue-100 hover:text-white text-lg font-bold">✕</button>
+          </div>
+          <form @submit.prevent="submitChangePassword" class="p-5 space-y-4 text-xs">
+            <div>
+              <label class="block font-medium text-gray-700 mb-1">Password Lama</label>
+              <input v-model="pwForm.oldPassword" type="password" autocomplete="current-password" required class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none" />
+            </div>
+            <div>
+              <label class="block font-medium text-gray-700 mb-1">Password Baru</label>
+              <input v-model="pwForm.newPassword" type="password" autocomplete="new-password" required placeholder="Minimal 8 karakter" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none" />
+            </div>
+            <div>
+              <label class="block font-medium text-gray-700 mb-1">Ulangi Password Baru</label>
+              <input v-model="pwForm.confirm" type="password" autocomplete="new-password" required class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none" />
+            </div>
+            <p v-if="pwForm.error" class="bg-red-50 border border-red-200 text-red-700 rounded-lg px-3 py-2">⚠️ {{ pwForm.error }}</p>
+            <div class="pt-3 flex justify-end space-x-2 border-t border-gray-100">
+              <button type="button" @click="pwForm.show = false" class="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg font-semibold hover:bg-gray-50 transition">Batal</button>
+              <button type="submit" :disabled="pwForm.loading" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold shadow transition disabled:opacity-50">
+                {{ pwForm.loading ? 'Menyimpan...' : 'Simpan' }}
+              </button>
+            </div>
+          </form>
         </div>
-      </header>
-
-      <!-- Main Content Area -->
-      <div class="flex-1 flex flex-col justify-between w-full">
-        <main class="p-4 sm:p-6 w-full">
-          <keep-alive>
-            <component :is="'page-' + currentMenu"></component>
-          </keep-alive>
-        </main>
-
-        <footer class="bg-white border-t border-gray-100 py-4 px-6 text-center text-xs text-gray-500 flex-shrink-0">
-          <span>Copyright &copy; 2026 - {{ currentYear }} SIMANDOR. All rights reserved.</span>
-        </footer>
       </div>
 
     </div>
   </div>
 
+  <!-- ===================== LAPISAN AUTENTIKASI FRONTEND ===================== -->
+  <script>
+    // Token sesi disimpan di sessionStorage (hilang saat tab ditutup); jika browser
+    // memblokir storage, token hanya disimpan di memori (login ulang setelah refresh).
+    const TokenStore = {
+      key: 'simandor_token',
+      mem: '',
+      get() { try { return sessionStorage.getItem(this.key) || this.mem; } catch (e) { return this.mem; } },
+      set(token) { this.mem = token; try { sessionStorage.setItem(this.key, token); } catch (e) {} },
+      clear() { this.mem = ''; try { sessionStorage.removeItem(this.key); } catch (e) {} }
+    };
+
+    const appAuth = Vue.reactive({ checking: true, user: null, token: '', notice: '' });
+
+    const authActions = {
+      setSession(token, user) {
+        appAuth.token = token;
+        appAuth.user = user;
+        appAuth.notice = '';
+        TokenStore.set(token);
+      },
+      expire(message) {
+        appAuth.token = '';
+        appAuth.user = null;
+        appAuth.notice = message || '';
+        TokenStore.clear();
+      }
+    };
+
+    function cleanError(err) {
+      const raw = (err && err.message) ? String(err.message) : 'Terjadi kesalahan pada server.';
+      return raw.replace(/^(?:Error:\s*)?(?:AUTH_FORBIDDEN|API_NOT_FOUND):\s*/, '');
+    }
+
+    /**
+     * Pengganti google.script.run: semua panggilan dilewatkan ke apiCall bersama token sesi.
+     * Cara pakai sama persis: appRun.withSuccessHandler(ok).withFailureHandler(gagal).namaFungsi(args)
+     * Jika sesi berakhir, pengguna otomatis dikembalikan ke halaman login.
+     */
+    function createRunner(onOk, onFail) {
+      return new Proxy({}, {
+        get(_, prop) {
+          if (prop === 'withSuccessHandler') return (fn) => createRunner(fn, onFail);
+          if (prop === 'withFailureHandler') return (fn) => createRunner(onOk, fn);
+          if (typeof prop !== 'string') return undefined;
+          return (...args) => {
+            if (typeof google === 'undefined' || !google.script || !google.script.run) {
+              if (onFail) onFail(new Error('Aplikasi tidak berjalan di lingkungan Apps Script.'));
+              return;
+            }
+            google.script.run
+              .withSuccessHandler((res) => { if (onOk) onOk(res); })
+              .withFailureHandler((err) => {
+                const raw = (err && err.message) ? String(err.message) : '';
+                if (raw.indexOf('AUTH_REQUIRED') !== -1) {
+                  authActions.expire('Sesi Anda telah berakhir. Silakan login kembali.');
+                  return;
+                }
+                if (onFail) onFail(new Error(cleanError(err)));
+              })
+              .apiCall(appAuth.token, prop, args);
+          };
+        }
+      });
+    }
+    Object.defineProperty(window, 'appRun', { get() { return createRunner(null, null); } });
+  </script>
+
   <!-- Memuat Komponen Modular dari File Terpisah (GAS Include) -->
-  <?!= include('Page_Beranda'); ?>
-  <?!= include('Page_Admin'); ?>
-  <?!= include('Page_User'); ?>
-  <?!= include('Page_Tahun'); ?>
-  <?!= include('Page_Tim'); ?>
-  <?!= include('Page_Kegiatan'); ?>
-  <?!= include('Page_Satuan'); ?>
-  <?!= include('Page_Pegawai'); ?>
-  <?!= include('Page_Tim_Anggota'); ?>
+  <?!= include_('Page_Beranda'); ?>
+  <?!= include_('Page_Admin'); ?>
+  <?!= include_('Page_User'); ?>
+  <?!= include_('Page_Tahun'); ?>
+  <?!= include_('Page_Tim'); ?>
+  <?!= include_('Page_Kegiatan'); ?>
+  <?!= include_('Page_Satuan'); ?>
+  <?!= include_('Page_Pegawai'); ?>
+  <?!= include_('Page_Tim_Anggota'); ?>
 
   <!-- Inisialisasi Vue.js Utama -->
   <script>
-    const { createApp, ref, onMounted, onUnmounted } = Vue;
+    const { createApp, ref, reactive, computed, onMounted, onUnmounted } = Vue;
 
     const app = createApp({
       setup() {
@@ -81,7 +268,12 @@
         const currentTime = ref('');
         const isSidebarOpen = ref(false);
         const currentYear = ref(new Date().getFullYear());
+        const userMenuOpen = ref(false);
         let timer = null;
+
+        // Hanya admin yang boleh membuka menu Admin (server tetap memeriksa di setiap panggilan)
+        const isAdmin = computed(() => !!appAuth.user && appAuth.user.LEVEL === 'admin');
+        const activeMenu = computed(() => (currentMenu.value === 'admin' && !isAdmin.value) ? 'beranda' : currentMenu.value);
 
         const toggleSidebar = () => {
           isSidebarOpen.value = !isSidebarOpen.value;
@@ -99,22 +291,137 @@
           currentTime.value = now.toLocaleDateString('id-ID', options) + ' WIB';
         };
 
+        const initials = (name) => {
+          const parts = String(name || '').trim().split(/\s+/).filter(Boolean);
+          if (!parts.length) return 'U';
+          return (parts[0].charAt(0) + (parts.length > 1 ? parts[1].charAt(0) : '')).toUpperCase();
+        };
+
+        // ---------- Toast global ----------
+        const toast = reactive({ show: false, message: '', type: 'success' });
+        const showToast = (message, type = 'success') => {
+          toast.message = message;
+          toast.type = type;
+          toast.show = true;
+          setTimeout(() => { toast.show = false; }, 3000);
+        };
+
+        // ---------- Login ----------
+        const loginForm = reactive({ email: '', password: '', showPassword: false, loading: false, error: '' });
+
+        const submitLogin = () => {
+          if (loginForm.loading) return;
+          loginForm.error = '';
+          if (!loginForm.email.trim() || !loginForm.password) {
+            loginForm.error = 'Email dan password wajib diisi.';
+            return;
+          }
+          if (typeof google === 'undefined' || !google.script) {
+            loginForm.error = 'Aplikasi tidak berjalan di lingkungan Apps Script.';
+            return;
+          }
+          loginForm.loading = true;
+          google.script.run
+            .withSuccessHandler((res) => {
+              loginForm.loading = false;
+              loginForm.password = '';
+              if (res && res.success) {
+                authActions.setSession(res.token, res.user);
+                currentMenu.value = 'beranda';
+              } else {
+                loginForm.error = (res && res.message) ? res.message : 'Login gagal.';
+              }
+            })
+            .withFailureHandler((err) => {
+              loginForm.loading = false;
+              loginForm.error = 'Tidak dapat terhubung ke server: ' + ((err && err.message) ? err.message : '');
+            })
+            .authLogin(loginForm.email.trim(), loginForm.password);
+        };
+
+        const logout = () => {
+          userMenuOpen.value = false;
+          const token = appAuth.token;
+          if (typeof google !== 'undefined' && google.script) {
+            google.script.run.authLogout(token);
+          }
+          authActions.expire('');
+        };
+
+        // ---------- Ubah password ----------
+        const pwForm = reactive({ show: false, oldPassword: '', newPassword: '', confirm: '', loading: false, error: '' });
+
+        const openChangePassword = () => {
+          userMenuOpen.value = false;
+          Object.assign(pwForm, { show: true, oldPassword: '', newPassword: '', confirm: '', loading: false, error: '' });
+        };
+
+        const submitChangePassword = () => {
+          pwForm.error = '';
+          if (pwForm.newPassword.length < 8) { pwForm.error = 'Password baru minimal 8 karakter.'; return; }
+          if (pwForm.newPassword !== pwForm.confirm) { pwForm.error = 'Konfirmasi password tidak sama.'; return; }
+          pwForm.loading = true;
+          appRun
+            .withSuccessHandler((res) => {
+              pwForm.loading = false;
+              if (res && res.success) {
+                appAuth.token = res.token;   // token lama sudah dicabut server
+                TokenStore.set(res.token);
+                pwForm.show = false;
+                showToast(res.message, 'success');
+              } else {
+                pwForm.error = (res && res.message) ? res.message : 'Gagal mengubah password.';
+              }
+            })
+            .withFailureHandler((err) => {
+              pwForm.loading = false;
+              pwForm.error = err.message;
+            })
+            .changePassword(pwForm.oldPassword, pwForm.newPassword);
+        };
+
+        // ---------- Pemulihan sesi saat halaman dimuat ----------
+        const restoreSession = () => {
+          const saved = TokenStore.get();
+          if (!saved || typeof google === 'undefined' || !google.script) {
+            appAuth.checking = false;
+            return;
+          }
+          google.script.run
+            .withSuccessHandler((res) => {
+              if (res && res.success) {
+                authActions.setSession(saved, res.user);
+              } else {
+                TokenStore.clear();
+              }
+              appAuth.checking = false;
+            })
+            .withFailureHandler(() => {
+              TokenStore.clear();
+              appAuth.checking = false;
+            })
+            .authSession(saved);
+        };
+
+        const closeUserMenu = () => { userMenuOpen.value = false; };
+
         onMounted(() => {
           updateClock();
           timer = setInterval(updateClock, 1000);
+          document.addEventListener('click', closeUserMenu);
+          restoreSession();
         });
 
         onUnmounted(() => {
           clearInterval(timer);
+          document.removeEventListener('click', closeUserMenu);
         });
 
         return {
-          currentMenu,
-          currentTime,
-          isSidebarOpen,
-          currentYear,
-          toggleSidebar,
-          toggleMobileSidebar
+          appAuth, isAdmin, activeMenu, currentMenu, currentTime, isSidebarOpen, currentYear,
+          userMenuOpen, toast, loginForm, pwForm,
+          toggleSidebar, toggleMobileSidebar, initials,
+          submitLogin, logout, openChangePassword, submitChangePassword
         };
       }
     });

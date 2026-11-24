@@ -5,7 +5,7 @@
  * Helper bersama (lock, pencarian baris, cek duplikat) ada di SheetRepo.gs.
  */
 
-function getTimAnggotaSheet() {
+function getTimAnggotaSheet_() {
   return getOrCreateSheet_('MASTER_TIM_ANGGOTA', [
     'ID_DETAIL_TIM', 'TAHUN_ID', 'TIM_ID', 'PEGAWAI_ID',
     'PERAN', 'KETERANGAN', 'CREATED_AT'
@@ -15,9 +15,9 @@ function getTimAnggotaSheet() {
 /**
  * Mengambil seluruh data anggota tim (beserta mapping label teks tahun, tim, dan pegawai).
  */
-function getTimAnggotaList() {
+function getTimAnggotaList_() {
   try {
-    var list = readObjects_(getTimAnggotaSheet());
+    var list = readObjects_(getTimAnggotaSheet_());
     if (!list.length) return [];
 
     var tahunMap = lookupMap_('MASTER_TAHUN', 'ID_TAHUN', 'TAHUN');             // ID_TAHUN -> TAHUN
@@ -39,7 +39,7 @@ function getTimAnggotaList() {
 /**
  * Mengambil referensi data Master (Tahun, Tim, dan Pegawai Aktif) untuk dropdown form.
  */
-function getMasterReferences() {
+function getMasterReferences_() {
   try {
     var ss = SpreadsheetApp.getActiveSpreadsheet();
     
@@ -112,10 +112,10 @@ function getMasterReferences() {
  * 2. CREATE / UPDATE: Menyimpan atau memperbarui data anggota tim (Mendukung Batch Multiple Pegawai).
  * Pegawai yang sama tidak boleh terdaftar dua kali pada kombinasi Tahun + Tim yang sama.
  */
-function saveTimAnggota(formData) {
+function saveTimAnggota_(formData) {
   try {
     return withLock_(function () {
-      var sheet = getTimAnggotaSheet();
+      var sheet = getTimAnggotaSheet_();
       var headers = getHeaders_(sheet);
 
       // Jika mode UPDATE (berdasarkan ID_DETAIL_TIM yang ada)
@@ -191,10 +191,10 @@ function saveTimAnggota(formData) {
   }
 }
 
-function deleteTimAnggota(idDetailTim) {
+function deleteTimAnggota_(idDetailTim) {
   try {
     return withLock_(function () {
-      var sheet = getTimAnggotaSheet();
+      var sheet = getTimAnggotaSheet_();
       var rowIndex = findRowById_(sheet, 'ID_DETAIL_TIM', idDetailTim);
 
       if (rowIndex) {
@@ -211,14 +211,14 @@ function deleteTimAnggota(idDetailTim) {
 /**
  * 4. BATCH DELETE: Menghapus beberapa data anggota tim sekaligus berdasarkan array ID_DETAIL_TIM.
  */
-function batchDeleteTimAnggota(idDetailTimArray) {
+function batchDeleteTimAnggota_(idDetailTimArray) {
   try {
     if (!Array.isArray(idDetailTimArray) || idDetailTimArray.length === 0) {
       return { success: false, message: 'Tidak ada data yang dipilih untuk dihapus.' };
     }
 
     return withLock_(function () {
-      var sheet = getTimAnggotaSheet();
+      var sheet = getTimAnggotaSheet_();
       var lastRow = sheet.getLastRow();
       var idCol = getHeaders_(sheet).indexOf('ID_DETAIL_TIM') + 1;
 

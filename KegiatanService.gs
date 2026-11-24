@@ -17,7 +17,7 @@ var KEGIATAN_REFERENCES_ = [];
  * Fungsi helper untuk mendapatkan objek Sheet 'MASTER_KEGIATAN'.
  * Jika sheet belum ada, otomatis dibuatkan beserta header kolomnya.
  */
-function getKegiatanSheet() {
+function getKegiatanSheet_() {
   return getOrCreateSheet_('MASTER_KEGIATAN', [
     'ID_KEGIATAN', 'TAHUN_ID', 'TIM_ID', 'NAMA_KEGIATAN', 'SINGKATAN_KEGIATAN',
     'CREATED_AT', 'CREATED_BY', 'UPDATED_AT', 'UPDATED_BY'
@@ -27,9 +27,9 @@ function getKegiatanSheet() {
 /**
  * 1. READ: Mengambil seluruh data kegiatan dari sheet beserta mapping relasi teks Tahun & Tim.
  */
-function getKegiatanList() {
+function getKegiatanList_() {
   try {
-    var list = readObjects_(getKegiatanSheet());
+    var list = readObjects_(getKegiatanSheet_());
     if (!list.length) return [];
 
     var tahunMap = lookupMap_('MASTER_TAHUN', 'ID_TAHUN', 'TAHUN');   // ID_TAHUN -> TAHUN
@@ -51,10 +51,10 @@ function getKegiatanList() {
  * Validasi: nama kegiatan wajib, Tahun harus ada, dan Tim harus ada
  * serta merupakan tim milik tahun yang dipilih.
  */
-function saveKegiatan(formData) {
+function saveKegiatan_(formData) {
   try {
     return withLock_(function () {
-      var sheet = getKegiatanSheet();
+      var sheet = getKegiatanSheet_();
       var headers = getHeaders_(sheet);
       var now = nowString_();
       var currentUser = Session.getActiveUser().getEmail() || "Admin";
@@ -63,11 +63,11 @@ function saveKegiatan(formData) {
       if (!String(formData.NAMA_KEGIATAN || '').trim()) {
         return { success: false, message: 'Gagal: Nama kegiatan wajib diisi!' };
       }
-      if (!existsRow_(getTahunSheet(), { ID_TAHUN: formData.TAHUN_ID })) {
+      if (!existsRow_(getTahunSheet_(), { ID_TAHUN: formData.TAHUN_ID })) {
         return { success: false, message: 'Gagal: Tahun yang dipilih tidak ditemukan!' };
       }
       // Satu pengecekan untuk dua hal: Tim ada, dan tim tersebut milik tahun yang dipilih
-      if (!existsRow_(getTimSheet(), { ID_TIM: formData.TIM_ID, TAHUN_ID: formData.TAHUN_ID })) {
+      if (!existsRow_(getTimSheet_(), { ID_TIM: formData.TIM_ID, TAHUN_ID: formData.TAHUN_ID })) {
         return { success: false, message: 'Gagal: Tim tidak ditemukan atau bukan tim pada tahun yang dipilih!' };
       }
 
@@ -102,10 +102,10 @@ function saveKegiatan(formData) {
  * 3. DELETE: Menghapus data kegiatan dari sheet berdasarkan ID_KEGIATAN.
  * Ditolak jika kegiatan masih dipakai tabel lain (lihat KEGIATAN_REFERENCES_).
  */
-function deleteKegiatan(idKegiatan) {
+function deleteKegiatan_(idKegiatan) {
   try {
     return withLock_(function () {
-      var sheet = getKegiatanSheet();
+      var sheet = getKegiatanSheet_();
       var rowIndex = findRowById_(sheet, 'ID_KEGIATAN', idKegiatan);
 
       if (!rowIndex) {

@@ -5,37 +5,124 @@
       <div class="space-y-6">
         
         <!-- Toast Notifikasi Melayang -->
-        <div v-if="toast.show" :class="toast.type === 'success' ? 'bg-green-600' : 'bg-red-600'" class="fixed top-5 right-5 z-50 text-white px-4 py-3 rounded-xl shadow-lg flex items-center space-x-2 text-xs transition-all duration-300">
-          <span>{{ toast.type === 'success' ? '✅' : '⚠️' }}</span>
-          <span class="font-medium">{{ toast.message }}</span>
+        <transition
+          enter-active-class="transform ease-out duration-300 transition"
+          enter-from-class="translate-y-2 opacity-0 sm:translate-y-0 sm:translate-x-2"
+          enter-to-class="translate-y-0 opacity-100 sm:translate-x-0"
+          leave-active-class="transition ease-in duration-200"
+          leave-from-class="opacity-100"
+          leave-to-class="opacity-0"
+        >
+          <div v-if="toast.show" :class="toast.type === 'success' ? 'bg-green-600' : 'bg-red-600'" class="fixed top-5 right-5 z-[70] text-white px-4 py-3 rounded-xl shadow-lg flex items-center space-x-2 text-xs">
+            <span>{{ toast.type === 'success' ? '✅' : '⚠️' }}</span>
+            <span class="font-medium">{{ toast.message }}</span>
+          </div>
+        </transition>
+
+        <!-- HERO CARD GRADASI BIRU (3 CARD: AKTIF, LAKI-LAKI, PEREMPUAN) -->
+        <div class="bg-gradient-to-br from-blue-600 via-blue-700 to-indigo-800 rounded-2xl shadow-lg p-5 sm:p-6 text-white relative overflow-hidden">
+          <div class="pointer-events-none absolute -right-12 -top-12 w-48 h-48 rounded-full bg-white/10 blur-xl"></div>
+          <div class="pointer-events-none absolute -left-16 -bottom-16 w-56 h-56 rounded-full bg-indigo-400/15 blur-2xl"></div>
+
+          <div class="relative z-10 space-y-5">
+            <!-- Baris Atas: Judul, Total Pegawai & Tombol Aksi -->
+            <div class="flex flex-col lg:flex-row lg:items-start justify-between gap-4">
+              <div>
+                <div class="flex items-center flex-wrap gap-2">
+                  <span class="text-xs font-medium text-blue-100">Master Pegawai Internal BPS</span>
+                  <span class="bg-white/15 border border-white/20 text-white text-[10px] font-bold px-2.5 py-0.5 rounded-full">
+                    {{ stats.aktif }} AKTIF
+                  </span>
+                </div>
+                <div class="mt-2 flex items-baseline gap-3">
+                  <div class="text-3xl sm:text-4xl font-extrabold tracking-tight">
+                    {{ stats.total }}
+                  </div>
+                  <span class="text-xs text-blue-100/90 font-medium">Total Pegawai Terdaftar</span>
+                </div>
+                <p class="text-[11px] text-blue-100/80 mt-1">
+                  Ringkasan status kepegawaian dan komposisi gender. Klik kartu status untuk memfilter tabel.
+                </p>
+              </div>
+
+              <div class="flex items-center flex-wrap gap-2">
+                <button
+                  type="button"
+                  @click="fetchData"
+                  :disabled="loading"
+                  class="bg-white/15 hover:bg-white/25 border border-white/20 text-white px-3 py-2 rounded-xl text-xs font-semibold backdrop-blur-xs transition flex items-center space-x-1.5 disabled:opacity-50 cursor-pointer"
+                  title="Muat ulang data"
+                >
+                  <svg :class="{'animate-spin': loading}" class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                  </svg>
+                  <span>Refresh</span>
+                </button>
+
+                <button
+                  type="button"
+                  @click="openModal('create')"
+                  class="bg-white text-blue-700 hover:bg-blue-50 px-3.5 py-2 rounded-xl text-xs font-bold shadow-sm transition flex items-center space-x-1.5 flex-shrink-0 cursor-pointer"
+                >
+                  <span>+ Tambah Pegawai</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- 3 Card Statistik: Pegawai Aktif, Pegawai Laki-Laki, Pegawai Perempuan -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <!-- Card 1: Pegawai Aktif -->
+              <button
+                type="button"
+                @click="toggleStatusFilter('Aktif')"
+                :class="filterStatus === 'Aktif' ? 'bg-white/25 border-white ring-2 ring-white/50' : 'bg-white/12 hover:bg-white/18 border-white/15'"
+                class="text-left rounded-xl border p-3.5 backdrop-blur-xs transition cursor-pointer group"
+              >
+                <div class="flex items-center justify-between text-[11px] text-blue-100 font-medium">
+                  <span class="inline-flex items-center gap-1.5">
+                    <span class="w-2 h-2 rounded-full bg-emerald-300"></span>
+                    <span>Pegawai Aktif</span>
+                  </span>
+                  <span class="text-[10px] opacity-80 group-hover:opacity-100">Aktif</span>
+                </div>
+                <div class="text-xl sm:text-2xl font-bold text-white mt-1.5">{{ stats.aktif }}</div>
+                <div class="text-[10px] text-blue-100/75 mt-0.5">Sedang bertugas</div>
+              </button>
+
+              <!-- Card 2: Pegawai Laki-Laki -->
+              <div class="rounded-xl bg-white/12 border border-white/15 p-3.5 backdrop-blur-xs flex items-center justify-between">
+                <div class="flex items-center gap-3">
+                  <div class="w-9 h-9 rounded-lg bg-white/15 border border-white/20 flex items-center justify-center text-sm font-bold">
+                    ♂️
+                  </div>
+                  <div>
+                    <div class="text-xs font-semibold text-white">Pegawai Laki-Laki</div>
+                    <div class="text-[10px] text-blue-100/75">Jenis kelamin L</div>
+                  </div>
+                </div>
+                <div class="text-xl sm:text-2xl font-extrabold text-white">{{ stats.lakiLaki }}</div>
+              </div>
+
+              <!-- Card 3: Pegawai Perempuan -->
+              <div class="rounded-xl bg-white/12 border border-white/15 p-3.5 backdrop-blur-xs flex items-center justify-between">
+                <div class="flex items-center gap-3">
+                  <div class="w-9 h-9 rounded-lg bg-white/15 border border-white/20 flex items-center justify-center text-sm font-bold">
+                    ♀️
+                  </div>
+                  <div>
+                    <div class="text-xs font-semibold text-white">Pegawai Perempuan</div>
+                    <div class="text-[10px] text-blue-100/75">Jenis kelamin P</div>
+                  </div>
+                </div>
+                <div class="text-xl sm:text-2xl font-extrabold text-white">{{ stats.perempuan }}</div>
+              </div>
+            </div>
+          </div>
         </div>
 
         <!-- Kartu Utama Master Pegawai -->
         <div class="bg-white border border-gray-100 rounded-xl shadow-sm overflow-hidden">
           
-          <!-- Header Card & Tombol Aksi -->
-          <div class="p-4 sm:p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-            <div>
-              <h3 class="text-sm font-semibold text-gray-900">Master Pegawai</h3>
-              <p class="text-xs text-gray-600 mt-0.5">Kelola data pegawai internal BPS (PNS & PPPK), baik status aktif maupun mutasi/pindah.</p>
-            </div>
-            
-            <div class="flex items-center space-x-2">
-              <button @click="fetchData" :disabled="loading" class="bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-2 rounded-lg text-xs font-semibold shadow-sm transition flex items-center space-x-1 disabled:opacity-50" title="Muat ulang data">
-                <svg :class="{'animate-spin': loading}" class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
-                </svg>
-                <span>Refresh</span>
-              </button>
-              
-              <button @click="openModal('create')" class="bg-blue-600 hover:bg-blue-700 text-white px-3.5 py-2 rounded-lg text-xs font-semibold shadow transition flex items-center space-x-1.5 flex-shrink-0">
-                <span>+ Tambah Pegawai</span>
-              </button>
-            </div>
-          </div>
-
-          <hr class="border-gray-100">
-
           <!-- Kontrol Atas Tabel (Filter & Pencarian) -->
           <div class="p-4 sm:p-5 bg-gray-50/50 border-b border-gray-100 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 text-xs">
             <div class="flex items-center space-x-2 text-gray-600">
@@ -116,7 +203,7 @@
                         <p class="text-[11px] text-gray-400">
                           {{ pegawaiList.length === 0 ? 'Silakan tambahkan pegawai baru melalui tombol di atas.' : 'Coba ubah kata kunci pencarian atau reset filter.' }}
                         </p>
-                        <button v-if="pegawaiList.length > 0 && (searchQuery || filterStatus || filterKategori)" @click="resetFilter" class="mt-2 px-3 py-1 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-md font-medium transition">
+                        <button v-if="pegawaiList.length > 0 && (searchQuery || filterStatus || filterKategori)" @click="resetFilter" class="mt-2 px-3 py-1 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-md font-medium transition cursor-pointer">
                           Reset Filter
                         </button>
                       </div>
@@ -169,11 +256,49 @@
                       </span>
                     </td>
 
-                    <!-- Aksi -->
-                    <td class="px-4 py-3 text-center space-x-1">
-                      <button @click="openModal('detail', item)" class="text-emerald-600 hover:text-emerald-900 bg-emerald-50 hover:bg-emerald-100 px-2.5 py-1 rounded-md font-medium transition" title="Lihat Detail">Detail</button>
-                      <button @click="openModal('edit', item)" class="text-indigo-600 hover:text-indigo-900 bg-indigo-50 hover:bg-indigo-100 px-2.5 py-1 rounded-md font-medium transition">Edit</button>
-                      <button @click="openDeleteModal(item)" class="text-red-600 hover:text-red-900 bg-red-50 hover:bg-red-100 px-2.5 py-1 rounded-md font-medium transition">Hapus</button>
+                    <!-- Aksi (Tombol Ikon Berbingkai + Tooltip) -->
+                    <td class="px-4 py-3 text-center whitespace-nowrap">
+                      <div class="inline-flex items-center justify-center gap-1.5">
+                        <!-- Tombol Detail -->
+                        <button
+                          type="button"
+                          @click="openModal('detail', item)"
+                          title="Detail Pegawai"
+                          aria-label="Detail Pegawai"
+                          class="w-8 h-8 inline-flex items-center justify-center rounded-lg bg-emerald-50 text-emerald-600 border border-emerald-200/80 hover:bg-emerald-600 hover:text-white hover:border-emerald-600 shadow-2xs active:scale-95 transition-all duration-150 cursor-pointer"
+                        >
+                          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>
+                          </svg>
+                        </button>
+
+                        <!-- Tombol Edit -->
+                        <button
+                          type="button"
+                          @click="openModal('edit', item)"
+                          title="Edit Pegawai"
+                          aria-label="Edit Pegawai"
+                          class="w-8 h-8 inline-flex items-center justify-center rounded-lg bg-indigo-50 text-indigo-600 border border-indigo-200/80 hover:bg-indigo-600 hover:text-white hover:border-indigo-600 shadow-2xs active:scale-95 transition-all duration-150 cursor-pointer"
+                        >
+                          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
+                          </svg>
+                        </button>
+
+                        <!-- Tombol Hapus -->
+                        <button
+                          type="button"
+                          @click="openDeleteModal(item)"
+                          title="Hapus Pegawai"
+                          aria-label="Hapus Pegawai"
+                          class="w-8 h-8 inline-flex items-center justify-center rounded-lg bg-red-50 text-red-600 border border-red-200/80 hover:bg-red-600 hover:text-white hover:border-red-600 shadow-2xs active:scale-95 transition-all duration-150 cursor-pointer"
+                        >
+                          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                          </svg>
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 </tbody>
@@ -202,133 +327,307 @@
 
         </div>
 
-        <!-- MODAL FORM TAMBAH / EDIT / DETAIL PEGAWAI -->
-        <div v-if="showModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm overflow-y-auto">
-          <div class="bg-white rounded-xl shadow-xl w-full max-w-2xl overflow-hidden my-8 transform transition-all">
-            <div :class="modalMode === 'detail' ? 'bg-emerald-600' : 'bg-blue-600'" class="px-5 py-4 flex justify-between items-center text-white transition-colors">
-              <h3 class="font-semibold text-sm">
-                {{ modalMode === 'detail' ? 'Detail Informasi Pegawai' : (isEditMode ? 'Edit Data Pegawai' : 'Tambah Pegawai Baru') }}
-              </h3>
-              <button @click="closeModal" class="text-white/80 hover:text-white text-lg font-bold">✕</button>
-            </div>
-
-            <form @submit.prevent="submitForm" class="p-5 space-y-4 text-xs">
-              <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <!-- MODAL DETAIL PEGAWAI (GRADASI BIRU & SMOOTH) -->
+        <transition
+          enter-active-class="ease-out duration-200"
+          enter-from-class="opacity-0"
+          enter-to-class="opacity-100"
+          leave-active-class="ease-in duration-150"
+          leave-from-class="opacity-100"
+          leave-to-class="opacity-0"
+        >
+          <div v-if="showModal && modalMode === 'detail'" @click.self="closeModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/55 backdrop-blur-xs overflow-y-auto">
+            <transition
+              appear
+              enter-active-class="ease-out duration-200"
+              enter-from-class="opacity-0 scale-95 translate-y-2"
+              enter-to-class="opacity-100 scale-100 translate-y-0"
+              leave-active-class="ease-in duration-150"
+              leave-from-class="opacity-100 scale-100 translate-y-0"
+              leave-to-class="opacity-0 scale-95 translate-y-2"
+            >
+              <div class="bg-white rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden my-8 border border-gray-100">
                 
-                <!-- Nama Lengkap -->
-                <div class="sm:col-span-2">
-                  <label class="block font-medium text-gray-700 mb-1">Nama Lengkap & Gelar <span v-if="modalMode !== 'detail'" class="text-red-500">*</span></label>
-                  <input v-model="form.NAMA_PEGAWAI" :disabled="modalMode === 'detail'" type="text" required placeholder="Contoh: Dr. Ahmad Dahlan, M.Si" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none disabled:bg-gray-50 disabled:text-gray-700" />
+                <!-- Header Profil Gradasi Dominan Biru -->
+                <div class="bg-gradient-to-r from-blue-600 via-blue-700 to-indigo-700 px-6 py-5 text-white relative">
+                  <button
+                    type="button"
+                    @click="closeModal"
+                    title="Tutup"
+                    class="w-8 h-8 rounded-full bg-white/15 hover:bg-white/25 text-white flex items-center justify-center transition cursor-pointer absolute top-4 right-4"
+                  >
+                    ✕
+                  </button>
+
+                  <div class="flex flex-col sm:flex-row sm:items-center gap-4 pr-8">
+                    <div class="w-14 h-14 rounded-2xl bg-white/20 backdrop-blur-xs border border-white/30 flex items-center justify-center text-lg font-bold shadow-inner flex-shrink-0">
+                      {{ getInitials(form.NAMA_PEGAWAI) }}
+                    </div>
+                    <div class="space-y-1.5">
+                      <div class="flex items-center flex-wrap gap-2">
+                        <span class="bg-white/20 text-white text-[10px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full">
+                          {{ form.KATEGORI || 'PNS' }}
+                        </span>
+                        <span :class="getStatusBadgeClass(form.STATUS)" class="text-[10px] font-bold px-2.5 py-0.5 rounded-full shadow-2xs">
+                          {{ form.STATUS || 'Aktif' }}
+                        </span>
+                      </div>
+                      <h3 class="font-bold text-base sm:text-lg leading-snug">{{ form.NAMA_PEGAWAI || '-' }}</h3>
+                      <p class="text-xs text-blue-50/90 font-medium">
+                        {{ form.JABATAN || 'Jabatan belum diatur' }}
+                        <span v-if="form.GOL_RUANG" class="text-blue-100/80"> • Gol/Ruang {{ form.GOL_RUANG }}</span>
+                      </p>
+                    </div>
+                  </div>
                 </div>
 
-                <!-- NIP Baru & NIP Lama -->
-                <div>
-                  <label class="block font-medium text-gray-700 mb-1">NIP Baru (18 Digit)</label>
-                  <input v-model="form.NIP_BARU" :disabled="modalMode === 'detail'" type="text" placeholder="199001012015031001" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none disabled:bg-gray-50 disabled:text-gray-700" />
-                </div>
-                <div>
-                  <label class="block font-medium text-gray-700 mb-1">NIP Lama (9 Digit)</label>
-                  <input v-model="form.NIP_LAMA" :disabled="modalMode === 'detail'" type="text" placeholder="340012345" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none disabled:bg-gray-50 disabled:text-gray-700" />
+                <!-- Isi Detail Terstruktur -->
+                <div class="p-6 space-y-5 text-xs max-h-[68vh] overflow-y-auto">
+                  
+                  <!-- 1. NIP Baru & NIP Lama -->
+                  <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div class="bg-slate-50 border border-slate-200/70 rounded-xl p-3.5">
+                      <div class="text-[10px] uppercase tracking-wider font-semibold text-slate-400">NIP Baru (18 Digit)</div>
+                      <div class="text-sm font-bold text-slate-800 mt-1 font-mono">{{ form.NIP_BARU || '-' }}</div>
+                    </div>
+                    <div class="bg-slate-50 border border-slate-200/70 rounded-xl p-3.5">
+                      <div class="text-[10px] uppercase tracking-wider font-semibold text-slate-400">NIP Lama (9 Digit)</div>
+                      <div class="text-sm font-bold text-slate-800 mt-1 font-mono">{{ form.NIP_LAMA || '-' }}</div>
+                    </div>
+                  </div>
+
+                  <!-- 2. Profil & Domisili -->
+                  <div class="space-y-2.5">
+                    <div class="text-[11px] font-bold uppercase tracking-wider text-gray-500 flex items-center gap-1.5">
+                      <span>🪪</span>
+                      <span>Profil & Domisili</span>
+                    </div>
+                    <div class="bg-gray-50/80 border border-gray-100 rounded-xl p-4 space-y-3">
+                      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                          <div class="text-[11px] text-gray-400">Jenis Kelamin</div>
+                          <div class="font-semibold text-gray-800 mt-0.5">
+                            {{ form.JENIS_KELAMIN === 'P' ? 'Perempuan' : 'Laki-Laki' }}
+                          </div>
+                        </div>
+                        <div>
+                          <div class="text-[11px] text-gray-400">Tanggal Lahir</div>
+                          <div class="font-semibold text-gray-800 mt-0.5">{{ formatTanggalIndo(form.TANGGAL_LAHIR) }}</div>
+                        </div>
+                      </div>
+                      <div class="pt-2 border-t border-gray-200/70">
+                        <div class="text-[11px] text-gray-400">Alamat Tempat Tinggal</div>
+                        <div class="text-gray-700 mt-0.5 leading-relaxed">{{ form.ALAMAT || 'Belum ada alamat yang tercatat.' }}</div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- 3. Kontak & Akun Email -->
+                  <div class="space-y-2.5">
+                    <div class="text-[11px] font-bold uppercase tracking-wider text-gray-500 flex items-center gap-1.5">
+                      <span>📬</span>
+                      <span>Kontak & Akun Email</span>
+                    </div>
+                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 bg-gray-50/80 border border-gray-100 rounded-xl p-4">
+                      <div>
+                        <div class="text-[11px] text-gray-400">No. WhatsApp / HP</div>
+                        <div class="font-semibold text-gray-800 mt-0.5">{{ form.NO_HP || '-' }}</div>
+                      </div>
+                      <div>
+                        <div class="text-[11px] text-gray-400">Email Pribadi (Gmail)</div>
+                        <div class="font-semibold text-gray-800 mt-0.5 break-all">{{ form.EMAIL_GMAIL || '-' }}</div>
+                      </div>
+                      <div>
+                        <div class="text-[11px] text-gray-400">Email Satker</div>
+                        <div class="font-semibold text-blue-600 mt-0.5 break-all">{{ form.EMAIL_SATKER || '-' }}</div>
+                      </div>
+                    </div>
+                  </div>
+
                 </div>
 
-                <!-- Kategori & Gol Ruang -->
-                <div>
-                  <label class="block font-medium text-gray-700 mb-1">Kategori <span v-if="modalMode !== 'detail'" class="text-red-500">*</span></label>
-                  <select v-model="form.KATEGORI" :disabled="modalMode === 'detail'" required class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none bg-white disabled:bg-gray-50 disabled:text-gray-700">
-                    <option value="PNS">PNS</option>
-                    <option value="PPPK">PPPK</option>
-                  </select>
-                </div>
-                <div>
-                  <label class="block font-medium text-gray-700 mb-1">Golongan / Ruang</label>
-                  <input v-model="form.GOL_RUANG" :disabled="modalMode === 'detail'" type="text" placeholder="Contoh: III/a, III/c" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none disabled:bg-gray-50 disabled:text-gray-700" />
+                <!-- Footer Modal Detail -->
+                <div class="px-6 py-4 bg-gray-50 border-t border-gray-100 flex items-center justify-between gap-2 text-xs">
+                  <button
+                    type="button"
+                    @click="switchDetailToEdit"
+                    class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold shadow-xs transition inline-flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
+                    </svg>
+                    <span>Edit Pegawai</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    @click="closeModal"
+                    class="px-4 py-2 border border-gray-300 bg-white hover:bg-gray-50 text-gray-700 rounded-lg font-semibold transition cursor-pointer"
+                  >
+                    Tutup
+                  </button>
                 </div>
 
-                <!-- Jabatan -->
-                <div>
-                  <label class="block font-medium text-gray-700 mb-1">Jabatan</label>
-                  <input v-model="form.JABATAN" :disabled="modalMode === 'detail'" type="text" placeholder="Contoh: Statistisi Ahli Muda" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none disabled:bg-gray-50 disabled:text-gray-700" />
-                </div>
-
-                <!-- Jenis Kelamin -->
-                <div>
-                  <label class="block font-medium text-gray-700 mb-1">Jenis Kelamin</label>
-                  <select v-model="form.JENIS_KELAMIN" :disabled="modalMode === 'detail'" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none bg-white disabled:bg-gray-50 disabled:text-gray-700">
-                    <option value="L">Laki-Laki</option>
-                    <option value="P">Perempuan</option>
-                  </select>
-                </div>
-
-                <!-- Tanggal Lahir -->
-                <div>
-                  <label class="block font-medium text-gray-700 mb-1">Tanggal Lahir</label>
-                  <input v-model="form.TANGGAL_LAHIR" :disabled="modalMode === 'detail'" type="date" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none disabled:bg-gray-50 disabled:text-gray-700" />
-                </div>
-
-                <!-- Status Pegawai -->
-                <div>
-                  <label class="block font-medium text-gray-700 mb-1">Status Kepegawaian <span v-if="modalMode !== 'detail'" class="text-red-500">*</span></label>
-                  <select v-model="form.STATUS" :disabled="modalMode === 'detail'" required class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none bg-white disabled:bg-gray-50 disabled:text-gray-700">
-                    <option value="Aktif">Aktif</option>
-                    <option value="Pindah">Pindah / Mutasi</option>
-                    <option value="Pensiun">Pensiun</option>
-                    <option value="Meninggal">Meninggal</option>
-                  </select>
-                </div>
-
-                <!-- No HP & Email Gmail -->
-                <div>
-                  <label class="block font-medium text-gray-700 mb-1">No. WhatsApp/HP</label>
-                  <input v-model="form.NO_HP" :disabled="modalMode === 'detail'" type="text" placeholder="08123456789" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none disabled:bg-gray-50 disabled:text-gray-700" />
-                </div>
-                <div>
-                  <label class="block font-medium text-gray-700 mb-1">Email Pribadi (Gmail)</label>
-                  <input v-model="form.EMAIL_GMAIL" :disabled="modalMode === 'detail'" type="email" placeholder="nama@gmail.com" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none disabled:bg-gray-50 disabled:text-gray-700" />
-                </div>
-
-                <!-- Email Satker -->
-                <div class="sm:col-span-2">
-                  <label class="block font-medium text-gray-700 mb-1">Email Satker (@bps.go.id)</label>
-                  <input v-model="form.EMAIL_SATKER" :disabled="modalMode === 'detail'" type="email" placeholder="nama@bps.go.id" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none disabled:bg-gray-50 disabled:text-gray-700" />
-                </div>
-
-                <!-- Alamat -->
-                <div class="sm:col-span-2">
-                  <label class="block font-medium text-gray-700 mb-1">Alamat Tempat Tinggal</label>
-                  <textarea v-model="form.ALAMAT" :disabled="modalMode === 'detail'" rows="2" placeholder="Alamat lengkap..." class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none disabled:bg-gray-50 disabled:text-gray-700"></textarea>
-                </div>
               </div>
-
-              <!-- Tombol Aksi Modal -->
-              <div class="pt-3 flex justify-end space-x-2 border-t border-gray-100">
-                <button type="button" @click="closeModal" class="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg font-semibold hover:bg-gray-50 transition">
-                  {{ modalMode === 'detail' ? 'Tutup' : 'Batal' }}
-                </button>
-                <button v-if="modalMode !== 'detail'" type="submit" :disabled="saving" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold shadow transition disabled:opacity-50 flex items-center space-x-1">
-                  <span v-if="saving" class="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin mr-1"></span>
-                  <span>{{ saving ? 'Menyimpan...' : 'Simpan' }}</span>
-                </button>
-              </div>
-            </form>
+            </transition>
           </div>
-        </div>
+        </transition>
+
+        <!-- MODAL FORM TAMBAH / EDIT PEGAWAI -->
+        <transition
+          enter-active-class="ease-out duration-200"
+          enter-from-class="opacity-0"
+          enter-to-class="opacity-100"
+          leave-active-class="ease-in duration-150"
+          leave-from-class="opacity-100"
+          leave-to-class="opacity-0"
+        >
+          <div v-if="showModal && modalMode !== 'detail'" @click.self="closeModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/55 backdrop-blur-xs overflow-y-auto">
+            <transition
+              appear
+              enter-active-class="ease-out duration-200"
+              enter-from-class="opacity-0 scale-95 translate-y-2"
+              enter-to-class="opacity-100 scale-100 translate-y-0"
+              leave-active-class="ease-in duration-150"
+              leave-from-class="opacity-100 scale-100 translate-y-0"
+              leave-to-class="opacity-0 scale-95 translate-y-2"
+            >
+              <div class="bg-white rounded-2xl shadow-xl w-full max-w-2xl overflow-hidden my-8">
+                <div class="bg-blue-600 px-5 py-4 flex justify-between items-center text-white">
+                  <h3 class="font-semibold text-sm">
+                    {{ isEditMode ? 'Edit Data Pegawai' : 'Tambah Pegawai Baru' }}
+                  </h3>
+                  <button @click="closeModal" class="text-white/80 hover:text-white text-lg font-bold cursor-pointer">✕</button>
+                </div>
+
+                <form @submit.prevent="submitForm" class="p-5 space-y-4 text-xs">
+                  <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    
+                    <!-- Nama Lengkap -->
+                    <div class="sm:col-span-2">
+                      <label class="block font-medium text-gray-700 mb-1">Nama Lengkap & Gelar <span class="text-red-500">*</span></label>
+                      <input v-model="form.NAMA_PEGAWAI" type="text" required placeholder="Contoh: Dr. Ahmad Dahlan, M.Si" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none" />
+                    </div>
+
+                    <!-- NIP Baru & NIP Lama -->
+                    <div>
+                      <label class="block font-medium text-gray-700 mb-1">NIP Baru (18 Digit)</label>
+                      <input v-model="form.NIP_BARU" type="text" placeholder="199001012015031001" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none" />
+                    </div>
+                    <div>
+                      <label class="block font-medium text-gray-700 mb-1">NIP Lama (9 Digit)</label>
+                      <input v-model="form.NIP_LAMA" type="text" placeholder="340012345" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none" />
+                    </div>
+
+                    <!-- Kategori & Gol Ruang -->
+                    <div>
+                      <label class="block font-medium text-gray-700 mb-1">Kategori <span class="text-red-500">*</span></label>
+                      <select v-model="form.KATEGORI" required class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none bg-white">
+                        <option value="PNS">PNS</option>
+                        <option value="PPPK">PPPK</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label class="block font-medium text-gray-700 mb-1">Golongan / Ruang</label>
+                      <input v-model="form.GOL_RUANG" type="text" placeholder="Contoh: III/a, III/c" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none" />
+                    </div>
+
+                    <!-- Jabatan -->
+                    <div>
+                      <label class="block font-medium text-gray-700 mb-1">Jabatan</label>
+                      <input v-model="form.JABATAN" type="text" placeholder="Contoh: Statistisi Ahli Muda" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none" />
+                    </div>
+
+                    <!-- Jenis Kelamin -->
+                    <div>
+                      <label class="block font-medium text-gray-700 mb-1">Jenis Kelamin</label>
+                      <select v-model="form.JENIS_KELAMIN" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none bg-white">
+                        <option value="L">Laki-Laki</option>
+                        <option value="P">Perempuan</option>
+                      </select>
+                    </div>
+
+                    <!-- Tanggal Lahir -->
+                    <div>
+                      <label class="block font-medium text-gray-700 mb-1">Tanggal Lahir</label>
+                      <input v-model="form.TANGGAL_LAHIR" type="date" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none" />
+                    </div>
+
+                    <!-- Status Pegawai -->
+                    <div>
+                      <label class="block font-medium text-gray-700 mb-1">Status Kepegawaian <span class="text-red-500">*</span></label>
+                      <select v-model="form.STATUS" required class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none bg-white">
+                        <option value="Aktif">Aktif</option>
+                        <option value="Pindah">Pindah / Mutasi</option>
+                        <option value="Pensiun">Pensiun</option>
+                        <option value="Meninggal">Meninggal</option>
+                      </select>
+                    </div>
+
+                    <!-- No HP & Email Gmail -->
+                    <div>
+                      <label class="block font-medium text-gray-700 mb-1">No. WhatsApp/HP</label>
+                      <input v-model="form.NO_HP" type="text" placeholder="08123456789" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none" />
+                    </div>
+                    <div>
+                      <label class="block font-medium text-gray-700 mb-1">Email Pribadi (Gmail)</label>
+                      <input v-model="form.EMAIL_GMAIL" type="email" placeholder="nama@gmail.com" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none" />
+                    </div>
+
+                    <!-- Email Satker -->
+                    <div class="sm:col-span-2">
+                      <label class="block font-medium text-gray-700 mb-1">Email Satker (@bps.go.id)</label>
+                      <input v-model="form.EMAIL_SATKER" type="email" placeholder="nama@bps.go.id" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none" />
+                    </div>
+
+                    <!-- Alamat -->
+                    <div class="sm:col-span-2">
+                      <label class="block font-medium text-gray-700 mb-1">Alamat Tempat Tinggal</label>
+                      <textarea v-model="form.ALAMAT" rows="2" placeholder="Alamat lengkap..." class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none"></textarea>
+                    </div>
+                  </div>
+
+                  <!-- Tombol Aksi Modal -->
+                  <div class="pt-3 flex justify-end space-x-2 border-t border-gray-100">
+                    <button type="button" @click="closeModal" class="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg font-semibold hover:bg-gray-50 transition cursor-pointer">
+                      Batal
+                    </button>
+                    <button type="submit" :disabled="saving" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold shadow transition disabled:opacity-50 flex items-center space-x-1 cursor-pointer">
+                      <span v-if="saving" class="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin mr-1"></span>
+                      <span>{{ saving ? 'Menyimpan...' : 'Simpan' }}</span>
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </transition>
+          </div>
+        </transition>
 
         <!-- MODAL KONFIRMASI HAPUS KUSTOM -->
-        <div v-if="showDeleteModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-          <div class="bg-white rounded-xl shadow-xl w-full max-w-sm overflow-hidden p-6 text-center space-y-4">
-            <div class="w-12 h-12 bg-red-100 text-red-600 rounded-full flex items-center justify-center mx-auto text-xl font-bold">⚠️</div>
-            <div>
-              <h3 class="font-semibold text-sm text-gray-900">Konfirmasi Hapus</h3>
-              <p class="text-xs text-gray-600 mt-1">Apakah Anda yakin ingin menghapus data pegawai <span class="font-semibold text-gray-800">"{{ selectedItem ? selectedItem.NAMA_PEGAWAI : '' }}"</span>?</p>
-            </div>
-            <div class="flex justify-center space-x-2 pt-2">
-              <button @click="closeDeleteModal" class="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg text-xs font-semibold hover:bg-gray-50 transition">Batal</button>
-              <button @click="executeDelete" :disabled="deleting" class="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-xs font-semibold shadow transition disabled:opacity-50">
-                {{ deleting ? 'Menghapus...' : 'Ya, Hapus' }}
-              </button>
+        <transition
+          enter-active-class="ease-out duration-200"
+          enter-from-class="opacity-0"
+          enter-to-class="opacity-100"
+          leave-active-class="ease-in duration-150"
+          leave-from-class="opacity-100"
+          leave-to-class="opacity-0"
+        >
+          <div v-if="showDeleteModal" @click.self="closeDeleteModal" class="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/55 backdrop-blur-xs">
+            <div class="bg-white rounded-2xl shadow-xl w-full max-w-sm overflow-hidden p-6 text-center space-y-4">
+              <div class="w-12 h-12 bg-red-100 text-red-600 rounded-full flex items-center justify-center mx-auto text-xl font-bold">⚠️</div>
+              <div>
+                <h3 class="font-semibold text-sm text-gray-900">Konfirmasi Hapus</h3>
+                <p class="text-xs text-gray-600 mt-1">Apakah Anda yakin ingin menghapus data pegawai <span class="font-semibold text-gray-800">"{{ selectedItem ? selectedItem.NAMA_PEGAWAI : '' }}"</span>?</p>
+              </div>
+              <div class="flex justify-center space-x-2 pt-2">
+                <button @click="closeDeleteModal" class="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg text-xs font-semibold hover:bg-gray-50 transition cursor-pointer">Batal</button>
+                <button @click="executeDelete" :disabled="deleting" class="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-xs font-semibold shadow transition disabled:opacity-50 cursor-pointer">
+                  {{ deleting ? 'Menghapus...' : 'Ya, Hapus' }}
+                </button>
+              </div>
             </div>
           </div>
-        </div>
+        </transition>
 
       </div>
     `,
@@ -364,6 +663,34 @@
       const perPage = ref(10);
       const currentPage = ref(1);
 
+      const stats = computed(() => {
+        const list = pegawaiList.value || [];
+        let aktif = 0;
+        let lakiLaki = 0;
+        let perempuan = 0;
+
+        list.forEach(item => {
+          const status = String(item.STATUS || 'Aktif').trim().toLowerCase();
+          if (status === 'aktif') aktif++;
+
+          const jk = String(item.JENIS_KELAMIN || '').trim().toLowerCase();
+          if (jk === 'l' || jk === 'laki-laki' || jk === 'laki') lakiLaki++;
+          else if (jk === 'p' || jk === 'perempuan' || jk === 'wanita') perempuan++;
+        });
+
+        return {
+          total: list.length,
+          aktif,
+          lakiLaki,
+          perempuan
+        };
+      });
+
+      const toggleStatusFilter = (status) => {
+        filterStatus.value = filterStatus.value === status ? '' : status;
+        currentPage.value = 1;
+      };
+
       const form = reactive({
         ID_PEGAWAI: '',
         NAMA_PEGAWAI: '',
@@ -397,6 +724,17 @@
         return name.substring(0, 2).toUpperCase();
       };
 
+      const formatTanggalIndo = (val) => {
+        if (!val) return '-';
+        const d = new Date(val);
+        if (Number.isNaN(d.getTime())) return String(val);
+        return d.toLocaleDateString('id-ID', {
+          day: '2-digit',
+          month: 'long',
+          year: 'numeric'
+        });
+      };
+
       const getStatusBadgeClass = (status) => {
         switch (status) {
           case 'Aktif':
@@ -415,7 +753,7 @@
       const fetchData = () => {
         loading.value = true;
         if (typeof google !== 'undefined' && google.script) {
-          google.script.run
+          appRun
             .withSuccessHandler((data) => {
               pegawaiList.value = data || [];
               loading.value = false;
@@ -498,6 +836,11 @@
         showModal.value = true;
       };
 
+      const switchDetailToEdit = () => {
+        modalMode.value = 'edit';
+        isEditMode.value = true;
+      };
+
       const closeModal = () => { showModal.value = false; };
 
       const submitForm = () => {
@@ -505,7 +848,7 @@
 
         saving.value = true;
         if (typeof google !== 'undefined' && google.script) {
-          google.script.run
+          appRun
             .withSuccessHandler((res) => {
               saving.value = false;
               if (res.success) {
@@ -539,7 +882,7 @@
         deleting.value = true;
 
         if (typeof google !== 'undefined' && google.script) {
-          google.script.run
+          appRun
             .withSuccessHandler((res) => {
               deleting.value = false;
               closeDeleteModal();
@@ -564,8 +907,9 @@
       return {
         pegawaiList, loading, saving, deleting, showModal, showDeleteModal, isEditMode, modalMode, form,
         searchQuery, filterStatus, filterKategori, perPage, currentPage, totalPages, startIndex, paginatedList, paginationInfo,
-        displayedPages, toast, getInitials, getStatusBadgeClass, resetFilter, changePage, openModal, closeModal, submitForm,
-        openDeleteModal, closeDeleteModal, executeDelete, fetchData, selectedItem
+        displayedPages, toast, stats, toggleStatusFilter, getInitials, formatTanggalIndo, getStatusBadgeClass, resetFilter,
+        changePage, openModal, switchDetailToEdit, closeModal, submitForm, openDeleteModal, closeDeleteModal, executeDelete,
+        fetchData, selectedItem
       };
     }
   };

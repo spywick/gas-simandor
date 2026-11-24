@@ -16,16 +16,16 @@ var TAHUN_REFERENCES_ = [
  * Fungsi helper untuk mendapatkan objek Sheet 'MASTER_TAHUN'.
  * Jika sheet belum ada, otomatis dibuatkan beserta 4 kolom utamanya.
  */
-function getTahunSheet() {
+function getTahunSheet_() {
   return getOrCreateSheet_('MASTER_TAHUN', ['ID_TAHUN', 'TAHUN', 'KETERANGAN', 'CREATED_AT']);
 }
 
 /**
  * 1. READ: Mengambil seluruh data tahun dari sheet.
  */
-function getTahunList() {
+function getTahunList_() {
   try {
-    return readObjects_(getTahunSheet());
+    return readObjects_(getTahunSheet_());
   } catch (error) {
     throw new Error("Gagal mengambil data tahun: " + error.message);
   }
@@ -34,10 +34,10 @@ function getTahunList() {
 /**
  * 2. CREATE / UPDATE: Menyimpan atau memperbarui data tahun (dengan validasi unik).
  */
-function saveTahun(formData) {
+function saveTahun_(formData) {
   try {
     return withLock_(function () {
-      var sheet = getTahunSheet();
+      var sheet = getTahunSheet_();
       var headers = getHeaders_(sheet);
 
       // Validasi duplikasi tahun
@@ -74,10 +74,10 @@ function saveTahun(formData) {
  * 3. DELETE: Menghapus data tahun berdasarkan ID_TAHUN.
  * Ditolak jika tahun masih dipakai Tim, Anggota Tim, atau Kegiatan.
  */
-function deleteTahun(idTahun) {
+function deleteTahun_(idTahun) {
   try {
     return withLock_(function () {
-      var sheet = getTahunSheet();
+      var sheet = getTahunSheet_();
       var rowIndex = findRowById_(sheet, 'ID_TAHUN', idTahun);
 
       if (!rowIndex) {

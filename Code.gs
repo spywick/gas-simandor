@@ -12,6 +12,6 @@ function doGet(e) {
 /**
  * Helper function untuk mengimpor/menyertakan file HTML lain
  */
-function include(filename) {
+function include_(filename) {
   return HtmlService.createHtmlOutputFromFile(filename).getContent();
 }
